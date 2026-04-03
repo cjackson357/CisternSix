@@ -1,34 +1,63 @@
 import socket
-import keyboard
+from pynput import keyboard
 import time
 import cv2
 import numpy as np
 import threading
 
-PI_IP = "192.168.1.3"
+# Note: Double check if you are still on 172.16.99.58 or if you moved networks!
+PI_IP = "192.168.1.3" 
 PORT = 5005
+
+# -------------------------------
+# 🔹 KEYBOARD STATE LISTENER
+# -------------------------------
+# We store the live status of your movement keys here
+key_state = {'w': 0, 'a': 0, 's': 0, 'd': 0}
+
+def on_press(key):
+    try:
+        char = key.char.lower()
+        if char in key_state:
+            key_state[char] = 1
+    except AttributeError:
+        pass # Ignore special keys like Shift or Ctrl
+
+def on_release(key):
+    try:
+        char = key.char.lower()
+        if char in key_state:
+            key_state[char] = 0
+    except AttributeError:
+        pass
+
+# Start listening to the keyboard in the background
+listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+listener.start()
 
 # -------------------------------
 # 🔹 SOCKET CONTROL THREAD
 # -------------------------------
 def control_thread():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((PI_IP, PORT))
-    print("Connected to Pi (control)")
-
     try:
+        sock.connect((PI_IP, PORT))
+        print("Connected to Pi (control)")
+
         while True:
-            w = int(keyboard.is_pressed("w"))
-            a = int(keyboard.is_pressed("a"))
-            s = int(keyboard.is_pressed("s"))
-            d = int(keyboard.is_pressed("d"))
+            # Read from our live state dictionary instead of polling
+            w = key_state['w']
+            a = key_state['a']
+            s = key_state['s']
+            d = key_state['d']
 
             message = f"{w},{a},{s},{d}\n"
             sock.sendall(message.encode())
 
             time.sleep(0.01)
 
-    except:
+    except Exception as e:
+        print(f"Socket disconnected or failed: {e}")
         sock.close()
 
 
