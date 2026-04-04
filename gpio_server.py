@@ -6,11 +6,6 @@ from motor_control import write_to_motors
 
 PORT = 5005
 
-PIN_W = 17
-PIN_A = 27
-PIN_S = 22
-PIN_D = 23
-
 # -------------------------------
 # 🔹 START CAMERA SUBPROCESSES
 # -------------------------------
@@ -41,16 +36,6 @@ time.sleep(1)
 # 🔹 GPIO SETUP
 # -------------------------------
 GPIO.setmode(GPIO.BCM)
-
-GPIO.setup(PIN_W, GPIO.OUT)
-GPIO.setup(PIN_A, GPIO.OUT)
-GPIO.setup(PIN_S, GPIO.OUT)
-GPIO.setup(PIN_D, GPIO.OUT)
-
-GPIO.output(PIN_W, GPIO.LOW)
-GPIO.output(PIN_A, GPIO.LOW)
-GPIO.output(PIN_S, GPIO.LOW)
-GPIO.output(PIN_D, GPIO.LOW)
 
 # -------------------------------
 # 🔹 SOCKET SERVER SETUP
@@ -92,18 +77,11 @@ try:
 finally:
     print("\nShutting down ROV systems...")
     
-    # 1. Stop the thrusters
-    GPIO.output(PIN_W, GPIO.LOW)
-    GPIO.output(PIN_A, GPIO.LOW)
-    GPIO.output(PIN_S, GPIO.LOW)
-    GPIO.output(PIN_D, GPIO.LOW)
-    GPIO.cleanup()
-    
-    # 2. Close the socket
+    # Close the socket
     conn.close()
     server.close()
     
-    # 3. Kill the camera streams (crucial!)
+    # Kill the camera streams (crucial!)
     for proc in camera_procs:
         proc.terminate()
         
