@@ -2,6 +2,7 @@ import socket
 import RPi.GPIO as GPIO
 import subprocess
 import time
+from motor_control import write_to_motors
 
 PORT = 5005
 
@@ -66,6 +67,8 @@ print("Connected from:", addr)
 
 buffer = ""
 
+speed = 12
+
 try:
     while True:
         data = conn.recv(1024)
@@ -79,12 +82,9 @@ try:
             line, buffer = buffer.split("\n", 1)
 
             try:
-                w, a, s, d = line.strip().split(",")
+                w, a, s, d, space, shift, up, down = line.strip().split(",")
 
-                GPIO.output(PIN_W, int(w))
-                GPIO.output(PIN_A, int(a))
-                GPIO.output(PIN_S, int(s))
-                GPIO.output(PIN_D, int(d))
+                write_to_motors(w, a, s, d, space, shift, up, down, speed)
 
             except:
                 pass
