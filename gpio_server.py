@@ -67,9 +67,9 @@ try:
             line, buffer = buffer.split("\n", 1)
 
             try:
-                w, a, s, d, space, shift, up, down = line.strip().split(",")
+                w, a, s, d, q, e, r, f = line.strip().split(",")
 
-                write_to_motors(w, a, s, d, space, shift, up, down, speed)
+                write_to_motors(w, a, s, d, q, e, r, f, speed)
 
             except:
                 pass

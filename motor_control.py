@@ -3,7 +3,7 @@ import serial
 import time
 
 ser = serial.Serial(
-    port='/dev/ttyAMA0',  # or /dev/ttyUSB0 if using USB adapter
+    port='/dev/serial0',  # or /dev/ttyUSB0 if using USB adapter
     baudrate=115200,
     timeout=1
 )
@@ -17,7 +17,7 @@ def send_all_motors(values):
     time.sleep(0.02)  # ~50Hz update rate
 
 
-def write_to_motors(w, a, s, d, space, shift, up, down, speed):
+def write_to_motors(w, a, s, d, q, e, r, f, speed):
     thrusters = 128 * np.ones(6)
     if w:
         thrusters[0:2] += speed
@@ -35,13 +35,13 @@ def write_to_motors(w, a, s, d, space, shift, up, down, speed):
         thrusters[2] -= speed
         thrusters[1] += speed
         thrusters[3] += speed
-    if space:
+    if q:
         thrusters[4] += speed
-    if shift:
+    if e:
         thrusters[4] -= speed
-    if up:
+    if r:
         thrusters[5] += speed
-    if down:
+    if f:
         thrusters[5] -= speed
 
     np.clamp(thrusters, 0, 255)
