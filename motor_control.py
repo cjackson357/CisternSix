@@ -21,28 +21,28 @@ def write_to_motors(w, a, s, d, q, e, r, f, speed):
     thrusters = 128 * np.ones(6)
     if w:
         thrusters[0:2] += speed
-        thrusters[2:4] -= speed
+        thrusters[2:4] -= 1.3 * speed
     if a: 
         thrusters[0] += speed
         thrusters[2] += speed
-        thrusters[1] -= speed
-        thrusters[3] -= speed
+        thrusters[1] -= 1.3 * speed
+        thrusters[3] -= 1.3 * speed
     if s:
-        thrusters[0:2] -= speed
+        thrusters[0:2] -= 1.3 * speed
         thrusters[2:4] += speed
     if d:
-        thrusters[0] -= speed
-        thrusters[2] -= speed
+        thrusters[0] -= 1.3 * speed
+        thrusters[2] -= 1.3 * speed
         thrusters[1] += speed
         thrusters[3] += speed
     if q:
         thrusters[4] += speed
     if e:
-        thrusters[4] -= speed
+        thrusters[4] -= 1.3 * speed
     if r:
         thrusters[5] += speed
     if f:
-        thrusters[5] -= speed
+        thrusters[5] -= 1.3 * speed
 
     np.clip(thrusters, 0, 255)
 

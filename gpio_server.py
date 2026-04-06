@@ -52,7 +52,7 @@ print("Connected from:", addr)
 
 buffer = ""
 
-speed = 12
+speed = 25
 
 try:
     while True:
