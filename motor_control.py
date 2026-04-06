@@ -44,6 +44,6 @@ def write_to_motors(w, a, s, d, q, e, r, f, speed):
     if f:
         thrusters[5] -= speed
 
-    np.clamp(thrusters, 0, 255)
+    np.clip(thrusters, 0, 255)
 
     send_all_motors(thrusters)

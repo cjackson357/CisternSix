@@ -67,7 +67,7 @@ try:
             line, buffer = buffer.split("\n", 1)
 
             try:
-                w, a, s, d, q, e, r, f = line.strip().split(",")
+                w, a, s, d, q, e, r, f = [int(x) for x in line.strip().split(",")]
 
                 write_to_motors(w, a, s, d, q, e, r, f, speed)
 
