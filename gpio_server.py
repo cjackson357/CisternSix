@@ -2,6 +2,8 @@ import socket
 import RPi.GPIO as GPIO
 import subprocess
 import time
+import sys
+import qwiic_icm20948
 from motor_control import write_to_motors
 
 PORT = 5005
@@ -37,6 +39,24 @@ time.sleep(1)
 # -------------------------------
 GPIO.setmode(GPIO.BCM)
 
+
+# -------------------------------
+# 🔹 IMU SETUP
+# -------------------------------
+print("Initializing SparkFun ICM-20948 IMU...")
+try:
+    imu = qwiic_icm20948.QwiicIcm20948()
+    if not imu.connected:
+        print("IMU not connected. Check I2C wiring.", file=sys.stderr)
+        imu = None
+    else:
+        imu.begin()
+        print("IMU initialized!")
+except Exception as e:
+    print(f"IMU Initialization failed: {e}")
+    imu = None
+
+
 # -------------------------------
 # 🔹 SOCKET SERVER SETUP
 # -------------------------------
@@ -50,32 +70,58 @@ print("Waiting for connection from Mac...")
 conn, addr = server.accept()
 print("Connected from:", addr)
 
-buffer = ""
+conn.setblocking(False) # Set socket to non-blocking mode for smoother control loop
 
+buffer = ""
 speed = 25
+last_imu_time = time.time()
+imu_send_rate = 0.1 # send data to laptop every 0.1s (10Hz)
 
 try:
     while True:
-        data = conn.recv(1024)
+        try:
+            data = conn.recv(1024)
 
-        if not data:
+            if not data:
+                break #laptop disconnected
+
+            buffer += data.decode()
+
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+
+                try:
+                    w, a, s, d, q, e, r, f = [int(x) for x in line.strip().split(",")]
+
+                    write_to_motors(w, a, s, d, q, e, r, f, speed)
+
+                except ValueError:
+                    pass
+        except BlockingIOError:
+            pass # no data this millisecond, keep looping
+        except ConnectionResetError:
             break
-
-        buffer += data.decode()
-
-        while "\n" in buffer:
-            line, buffer = buffer.split("\n", 1)
-
+        
+        if imu and (time.time() - last_imu_time) >= imu_send_rate:
             try:
-                w, a, s, d, q, e, r, f = [int(x) for x in line.strip().split(",")]
+                if imu.dataReady():
+                    imu.getAgmt()
 
-                write_to_motors(w, a, s, d, q, e, r, f, speed)
+                    telemetry = f"IMU,{imu.ax},{imu.ay},{imu.az},{imu.gx},{imu.gy},{imu.gz}\n"
+                    conn.sendall(telemetry.encode())
 
-            except:
+                    last_imu_time = time.time()
+            except Exception as e:
                 pass
+        
 
 finally:
     print("\nShutting down ROV systems...")
+
+    try:
+        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, speed) # Stop all motors
+    except:
+        pass
     
     # Close the socket
     conn.close()

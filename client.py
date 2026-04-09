@@ -41,6 +41,9 @@ def control_thread():
         sock.connect((PI_IP, PORT))
         print("Connected to Pi (control)")
 
+        sock.setblocking(False)
+        buffer = ""
+
         while True:
             w = key_state['w']
             a = key_state['a']
@@ -54,12 +57,25 @@ def control_thread():
             message = f"{w},{a},{s},{d},{q},{e},{r},{f}\n"
             sock.sendall(message.encode())
 
+            try:
+                data = sock.recv(1024)
+                if data:
+                    buffer += data.decode()
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        if line.startswith("IMU:"):
+                            print(f"Sensor Data -> {line}")
+            except BlockingIOError:
+                pass
+            except Exception as e:
+                print(f"Connection error: {e}")
+                break
+
             time.sleep(0.01)
 
     except Exception as e:
         print(f"Socket disconnected or failed: {e}")
         sock.close()
-
 
 class CameraStream:
     def __init__(self, url):
@@ -116,5 +132,9 @@ print("All camera threads started")
 #         cam.stop()
 #     cv2.destroyAllWindows()
 
-while True:
-    continue
+print("Client running. Press Ctrl+C to quit.")
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("\nShutting down client.")
