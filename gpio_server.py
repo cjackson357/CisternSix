@@ -107,12 +107,17 @@ try:
                 if imu.dataReady():
                     imu.getAgmt()
 
-                    telemetry = f"IMU,{imu.ax},{imu.ay},{imu.az},{imu.gx},{imu.gy},{imu.gz}\n"
+                    telemetry = f"IMU:{imu.axRaw},{imu.ayRaw},{imu.azRaw},{imu.gxRaw},{imu.gyRaw},{imu.gzRaw}\n"
+                    
                     conn.sendall(telemetry.encode())
-
                     last_imu_time = time.time()
+                    
+                    # 🔹 NEW: Print the exact string being sent to the Mac
+                    print(f"Successfully read and sent: {telemetry.strip()}")
+                    
             except Exception as e:
-                pass
+                # 🔹 NEW: Instead of 'pass', print the error so you know exactly why it failed
+                print(f"IMU Read Error: {e}")
         
 
 finally:
