@@ -2,7 +2,7 @@ import socket
 import RPi.GPIO as GPIO
 import subprocess
 import time
-from motor_control import write_to_motors
+from motor_control_xbox import write_to_motors
 
 PORT = 5005
 
