@@ -1,3 +1,5 @@
+import os
+import serial
 import socket
 import RPi.GPIO as GPIO
 import subprocess
@@ -11,7 +13,8 @@ PORT = 5005
 # -------------------------------
 # 🔹 GPIO & LED SETUP
 # -------------------------------
-D1, D2, D3 = 23, 24, 25
+#D1, D2, D3 = 23, 24, 25
+D1, D2, D3 = 24, 23, 25 # D1=UART, D2=IMU, D3=Cameras (seems like D1 and D2 are swapped)
 GPIO.setmode(GPIO.BCM)
 GPIO.setup([D1, D2, D3], GPIO.OUT)
 
@@ -24,7 +27,7 @@ def update_leds(uart_status, imu_status, cam_status):
     Note: In a high-speed loop, 'blinking' requires a toggle check.
     """
     # Simple toggle for blinking effect when status is False
-    blink_tick = int(time.time() * 2) % 2 == 0 
+    blink_tick = int(time.time() * 5) % 2 == 0 
     
     # D1 - UART (Simulated by checking if we have a socket connection or serial)
     GPIO.output(D1, GPIO.HIGH if uart_status else (GPIO.HIGH if blink_tick else GPIO.LOW))
@@ -42,12 +45,14 @@ def update_leds(uart_status, imu_status, cam_status):
 print("Starting camera streams in the background...")
 
 # Define the 4 ustreamer commands
+ustreamer_path = "/home/cistern6-b/ustreamer/ustreamer"
 camera_commands = [
-    ["./ustreamer/ustreamer", "--device", "/dev/video0", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8080"],
-    ["./ustreamer/ustreamer", "--device", "/dev/video2", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8081"],
-    ["./ustreamer/ustreamer", "--device", "/dev/video4", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8082"],
-    ["./ustreamer/ustreamer", "--device", "/dev/video6", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8083"]
+    [ustreamer_path, "--device", "/dev/video0", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8080"],
+    [ustreamer_path, "--device", "/dev/video2", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8081"],
+    [ustreamer_path, "--device", "/dev/video4", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8082"],
+    [ustreamer_path, "--device", "/dev/video6", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8083"]
 ]
+
 
 camera_procs = []
 
@@ -59,14 +64,15 @@ for cmd in camera_commands:
     except Exception as e:
         print(f"Failed to start camera on port {cmd[-1]}: {e}")
 
-cams_ok = len(camera_procs) == 4 #initial camera status check
+cams_ok = True
+for cmd in camera_commands:
+    device_path = cmd[2]  # This is the "/dev/videoX" string from your list
+    if not os.path.exists(device_path):
+        cams_ok = False
+        print(f"Hardware missing: {device_path} is not plugged in.")
 # Give the cameras a brief second to warm up
 time.sleep(1) 
 
-# -------------------------------
-# 🔹 GPIO SETUP
-# -------------------------------
-GPIO.setmode(GPIO.BCM)
 
 
 # -------------------------------
@@ -75,15 +81,34 @@ GPIO.setmode(GPIO.BCM)
 print("Initializing SparkFun ICM-20948 IMU...")
 imu_ok = False
 try:
-    imu = qwiic_icm20948.QwiicIcm20948()
+    imu = qwiic_icm20948.QwiicIcm20948(address=0x68)
     if imu.connected:
         imu.begin()
         imu_ok = True
+        print("IMU successfully connected!")
     else:
         imu = None
-except Exception:
+        print("IMU object created, but reports as disconnected. (Check I2C address)")
+except Exception as e:
     imu = None
+    print(f"IMU Initialization Error: {e}")
 
+
+# -------------------------------
+# 🔹 ARDUINO UART SETUP
+# -------------------------------
+print("Checking UART connection to Arduino...")
+arduino_ok = False
+try:
+    # /dev/serial0 is the Pi's default hardware UART alias (GPIO 14 & 15)
+    arduino_serial = serial.Serial('/dev/serial0', baudrate=115200, timeout=1)
+    arduino_ok = arduino_serial.is_open
+    if arduino_ok:
+        print("UART to Arduino successfully opened!")
+        # If motor_control.py needs to open this port itself, uncomment the next line:
+        # arduino_serial.close() 
+except Exception as e:
+    print(f"UART Initialization Error: {e}")
 
 # -------------------------------
 # 🔹 SOCKET SERVER SETUP
@@ -96,7 +121,7 @@ server.listen(1)
 print("Waiting for connection from Laptop...")
 while True:
     server.settimeout(0.1)
-    update_leds(False, imu_ok, cams_ok) # UART LED (D1) will blink while waiting
+    update_leds(arduino_ok, imu_ok, cams_ok) # UART LED (D1) will blink while waiting
     try:
         conn, addr = server.accept()
         print("Connected from:", addr)
@@ -106,10 +131,10 @@ while True:
     except socket.timeout:
         continue
 
-conn, addr = server.accept()
-print("Connected from:", addr)
+# conn, addr = server.accept()
+# print("Connected from:", addr)
 
-conn.setblocking(False) # Set socket to non-blocking mode for smoother control loop
+# conn.setblocking(False) # Set socket to non-blocking mode for smoother control loop
 
 buffer = ""
 speed = 25
@@ -118,7 +143,8 @@ imu_send_rate = 0.1 # send data to laptop every 0.1s (10Hz)
 
 try:
     while True:
-        update_leds(True, imu_ok, cams_ok) #update indicators at top of loop
+        time.sleep(0.01)
+        update_leds(arduino_ok, imu_ok, cams_ok) #update indicators at top of loop
 
         try:
             data = conn.recv(1024)
