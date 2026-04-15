@@ -10,9 +10,6 @@ from inputs import get_gamepad
 PI_IP = "192.168.1.3"
 PORT = 5005
 
-# -------------------------------
-# 🎮 CONTROLLER SETTINGS
-# -------------------------------
 DEADZONE = 0.1
 
 def apply_deadzone(val):
@@ -26,12 +23,8 @@ rt = 0
 dpad_up = 0
 dpad_down = 0
 
-# -------------------------------
-# 🎮 INPUT THREAD
-# -------------------------------
 def input_thread():
     global lx, ly, lt, rt, dpad_up, dpad_down
-
     while True:
         events = get_gamepad()
         for event in events:
@@ -47,158 +40,97 @@ def input_thread():
                 dpad_up = 1 if event.state == -1 else 0
                 dpad_down = 1 if event.state == 1 else 0
 
-# -------------------------------
-# 📷 CAMERA STREAM
-# -------------------------------
-class CameraStream:
-    def __init__(self, url):
-        self.cap = cv2.VideoCapture(url)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self.frame = np.zeros((240, 320, 3), dtype=np.uint8)
-        self.running = True
-        self.thread = threading.Thread(target=self.update, daemon=True)
-        self.thread.start()
-
-    def update(self):
-        while self.running:
-            if self.cap.isOpened():
-                self.cap.grab()
-                ret, frame = self.cap.read()
-                if ret:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    self.frame = cv2.resize(frame, (320, 240))
-
-    def get_frame(self):
-        return self.frame
-
-    def stop(self):
-        self.running = False
-        if self.cap.isOpened():
-            self.cap.release()
-
-# -------------------------------
-# 🧠 MAIN DASHBOARD
-# -------------------------------
 class ROVDashboard:
     def __init__(self, root):
         self.root = root
         self.root.title("ROV Command Station")
         self.root.configure(bg="#1e1e1e")
 
-        self.connected = False
         self.running = True
-
         self.setup_ui()
 
-        # Camera URLs
-        urls = [
-            f"http://{PI_IP}:8080/?action=stream",
-            f"http://{PI_IP}:8081/?action=stream",
-            f"http://{PI_IP}:8082/?action=stream",
-            f"http://{PI_IP}:8083/?action=stream"
-        ]
-
-        self.cams = [CameraStream(url) for url in urls]
-
-        # Start threads
-        threading.Thread(target=self.network_loop, daemon=True).start()
         threading.Thread(target=input_thread, daemon=True).start()
-
-        self.update_video()
         self.update_ui_loop()
 
     def setup_ui(self):
-        self.video_label = tk.Label(self.root, bg="black")
-        self.video_label.grid(row=0, column=0, padx=10, pady=10)
-
         self.panel = tk.Frame(self.root, bg="#1e1e1e")
-        self.panel.grid(row=0, column=1, sticky="n", padx=10, pady=20)
+        self.panel.pack(padx=20, pady=20)
 
-        tk.Label(self.panel, text="STATUS", fg="white", bg="#1e1e1e", font=("Arial", 16, "bold")).pack()
-        self.status_label = tk.Label(self.panel, text="DISCONNECTED", fg="red", bg="#1e1e1e")
-        self.status_label.pack(pady=10)
+        # --- Controller Image ---
+        self.canvas = tk.Canvas(self.panel, width=400, height=300, bg="#1e1e1e", highlightthickness=0)
+        self.canvas.pack()
 
-        self.control_label = tk.Label(self.panel, text="Controller Active", fg="white", bg="#1e1e1e")
-        self.control_label.pack(pady=10)
+        self.controller_img = Image.open("controller.png")  # user-provided
+        self.controller_img = self.controller_img.resize((400, 300))
+        self.controller_tk = ImageTk.PhotoImage(self.controller_img)
+        self.canvas.create_image(0, 0, anchor="nw", image=self.controller_tk)
 
-        self.estop_btn = tk.Button(self.panel, text="EMERGENCY STOP", bg="red", command=self.estop)
-        self.estop_btn.pack(pady=40)
+        # --- Trigger Rectangles ---
+        self.lt_rect = self.canvas.create_rectangle(50, 310, 150, 340, outline="white")
+        self.rt_rect = self.canvas.create_rectangle(250, 310, 350, 340, outline="white")
 
-    def estop(self):
-        global lx, ly, lt, rt
-        lx = ly = lt = rt = 0
-        print("EMERGENCY STOP")
+        # Labels
+        self.canvas.create_text(100, 355, text="LT", fill="white", font=("Arial", 12, "bold"))
+        self.canvas.create_text(300, 355, text="RT", fill="white", font=("Arial", 12, "bold"))
 
-    def network_loop(self):
-        global lx, ly, lt, rt, dpad_up, dpad_down
+        # --- Joystick ---
+        self.joy_center = (200, 420)
+        self.joy_radius = 40
 
-        while self.running:
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.connect((PI_IP, PORT))
+        self.canvas.config(height=500)
 
-                self.connected = True
-                self.status_label.config(text="CONNECTED", fg="lime")
+        self.canvas.create_oval(
+            self.joy_center[0] - self.joy_radius,
+            self.joy_center[1] - self.joy_radius,
+            self.joy_center[0] + self.joy_radius,
+            self.joy_center[1] + self.joy_radius,
+            outline="white"
+        )
 
-                while self.running:
-                    w = 1 if ly < -0.2 else 0
-                    s = 1 if ly > 0.2 else 0
-                    a = 1 if lx < -0.2 else 0
-                    d = 1 if lx > 0.2 else 0
+        self.joy_dot = self.canvas.create_oval(0, 0, 0, 0, fill="white")
 
-                    q = 1 if rt > 0.2 else 0
-                    e = 1 if lt > 0.2 else 0
+        # --- D-Pad Cross ---
+        self.dpad_center = (200, 520)
+        self.dpad_size = 20
 
-                    r = dpad_up
-                    f = dpad_down
+        self.canvas.config(height=600)
 
-                    msg = f"{w},{a},{s},{d},{q},{e},{r},{f}\n"
-                    sock.sendall(msg.encode())
-
-                    time.sleep(0.02)
-
-            except Exception:
-                self.connected = False
-                self.status_label.config(text="DISCONNECTED", fg="red")
-                time.sleep(1)
-
-    def update_video(self):
-        if not self.running:
-            return
-
-        frames = [cam.get_frame() for cam in self.cams]
-
-        top = cv2.hconcat([frames[0], frames[1]])
-        bottom = cv2.hconcat([frames[2], frames[3]])
-        grid = cv2.vconcat([top, bottom])
-
-        img = Image.fromarray(grid)
-        imgtk = ImageTk.PhotoImage(image=img)
-
-        self.video_label.imgtk = imgtk
-        self.video_label.configure(image=imgtk)
-
-        self.root.after(30, self.update_video)
+        # Up
+        self.dpad_up_rect = self.canvas.create_rectangle(190, 500, 210, 520, fill="white")
+        # Down
+        self.dpad_down_rect = self.canvas.create_rectangle(190, 540, 210, 560, fill="white")
+        # Center horizontal
+        self.canvas.create_rectangle(170, 520, 230, 540, fill="white")
 
     def update_ui_loop(self):
-        global lx, ly, lt, rt
+        global lx, ly, lt, rt, dpad_up, dpad_down
 
-        text = f"LX:{lx:.2f} LY:{ly:.2f}\nLT:{lt:.2f} RT:{rt:.2f}"
-        self.control_label.config(text=text)
+        # --- Triggers ---
+        lt_color = "lime" if lt > 0.2 else ""
+        rt_color = "lime" if rt > 0.2 else ""
 
-        self.root.after(100, self.update_ui_loop)
+        self.canvas.itemconfig(self.lt_rect, fill=lt_color)
+        self.canvas.itemconfig(self.rt_rect, fill=rt_color)
 
-    def on_closing(self):
-        self.running = False
-        for cam in self.cams:
-            cam.stop()
-        self.root.destroy()
+        # --- Joystick ---
+        cx, cy = self.joy_center
+        r = self.joy_radius
 
-# -------------------------------
-# 🚀 START APP
-# -------------------------------
+        x = cx + lx * r
+        y = cy + ly * r
+
+        color = "lime" if abs(lx) > 0.1 or abs(ly) > 0.1 else "white"
+
+        self.canvas.coords(self.joy_dot, x-8, y-8, x+8, y+8)
+        self.canvas.itemconfig(self.joy_dot, fill=color)
+
+        # --- D-Pad ---
+        self.canvas.itemconfig(self.dpad_up_rect, fill="lime" if dpad_up else "white")
+        self.canvas.itemconfig(self.dpad_down_rect, fill="lime" if dpad_down else "white")
+
+        self.root.after(50, self.update_ui_loop)
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = ROVDashboard(root)
-    root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
