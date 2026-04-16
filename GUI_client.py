@@ -5,27 +5,117 @@ import cv2
 import numpy as np
 import threading
 import time
+from inputs import get_gamepad
+import urllib.request
 
-PI_IP = "192.168.1.3"
+PI_IP = "192.168.137.2"
 PORT = 5005
 
+DEADZONE = 0.1
+
+def apply_deadzone(val):
+    return val if abs(val) > DEADZONE else 0
+
+# Controller state
+lx = 0
+ly = 0
+lt = 0
+rt = 0
+dpad_up = 0
+dpad_down = 0
+
+# -------------------------------
+# 🎮 INPUT THREAD
+# -------------------------------
+def input_thread():
+    global lx, ly, lt, rt, dpad_up, dpad_down
+    while True:
+        events = get_gamepad()
+        for event in events:
+            if event.code == 'ABS_X':
+                lx = apply_deadzone(event.state / 32768)
+            elif event.code == 'ABS_Y':
+                ly = apply_deadzone(-event.state / 32768)
+            elif event.code == 'ABS_Z':
+                lt = event.state / 255
+            elif event.code == 'ABS_RZ':
+                rt = event.state / 255
+            elif event.code == 'ABS_HAT0Y':
+                dpad_up = 1 if event.state == -1 else 0
+                dpad_down = 1 if event.state == 1 else 0
+
+# -------------------------------
+# 🌐 NETWORK THREAD
+# -------------------------------
+def network_thread():
+    global lx, ly, lt, rt, dpad_up, dpad_down
+
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((PI_IP, PORT))
+            print("Connected to Pi (control)")
+
+            sock.setblocking(False)
+            buffer = ""
+
+            while True:
+                msg = f"{lx},{ly},{lt},{rt},{dpad_up},{dpad_down}\n"
+                sock.sendall(msg.encode())
+
+                try:
+                    data = sock.recv(1024)
+                    if data:
+                        buffer += data.decode()
+                        while "\n" in buffer:
+                            line, buffer = buffer.split("\n", 1)
+                            if line.startswith("IMU:"):
+                                print(f"Sensor Data -> {line}")
+                except BlockingIOError:
+                    pass
+                except Exception as e:
+                    print(f"Connection error: {e}")
+                    break
+
+                time.sleep(0.02)
+
+        except:
+            time.sleep(1)
+
+# -------------------------------
+# 📷 CAMERA STREAM
+# -------------------------------
 class CameraStream:
-    """Fetches video frames in the background to prevent GUI lag"""
     def __init__(self, url):
-        self.cap = cv2.VideoCapture(url)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.url = url
+        self.cap = None
         self.frame = np.zeros((240, 320, 3), dtype=np.uint8)
-        self.running = True
-        self.thread = threading.Thread(target=self.update, daemon=True)
-        self.thread.start()
+        self.running = False
+
+        # Test connection BEFORE opening
+        if self.check_stream():
+            self.cap = cv2.VideoCapture(url)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.running = True
+            self.thread = threading.Thread(target=self.update, daemon=True)
+            self.thread.start()
+            print(f"Camera connected: {url}")
+        else:
+            print(f"Camera unavailable: {url}")
+
+    def check_stream(self):
+        try:
+            urllib.request.urlopen(self.url, timeout=1)
+            return True
+        except:
+            return False
 
     def update(self):
         while self.running:
-            if self.cap.isOpened():
-                self.cap.grab()  
+            if self.cap and self.cap.isOpened():
+                self.cap.grab()
                 ret, frame = self.cap.read()
                 if ret:
-                    # Convert BGR (OpenCV) to RGB (Tkinter)
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     self.frame = cv2.resize(frame, (320, 240))
 
@@ -34,144 +124,128 @@ class CameraStream:
 
     def stop(self):
         self.running = False
-        if self.cap.isOpened():
+        if self.cap and self.cap.isOpened():
             self.cap.release()
 
+# -------------------------------
+# 🧠 MAIN DASHBOARD
+# -------------------------------
 class ROVDashboard:
     def __init__(self, root):
         self.root = root
-        self.root.title("Cistern ROV Command Station")
-        self.root.configure(bg="#1e1e1e") # Dark mode looks more professional
+        self.root.title("ROV Command Station")
+        self.root.configure(bg="#1e1e1e")
 
-        # ROV State
-        self.key_state = {'w': 0, 'a': 0, 's': 0, 'd': 0}
-        self.connected = False
         self.running = True
 
-        # Setup GUI Layout
         self.setup_ui()
 
-        # Bind Keyboard Events (Only works when window is in focus - safer!)
-        self.root.bind("<KeyPress>", self.on_press)
-        self.root.bind("<KeyRelease>", self.on_release)
-
-        # Start Camera Streams
+        # Camera URLs
         urls = [
             f"http://{PI_IP}:8080/?action=stream",
             f"http://{PI_IP}:8081/?action=stream",
             f"http://{PI_IP}:8082/?action=stream",
             f"http://{PI_IP}:8083/?action=stream"
         ]
-        self.cams = [CameraStream(url) for url in urls]
 
-        # Start Background Threads
-        threading.Thread(target=self.network_loop, daemon=True).start()
-        
-        # Start GUI Video Loop
+        # Only keep working cameras
+        self.cams = []
+        for url in urls:
+            cam = CameraStream(url)
+            if cam.running:
+                self.cams.append(cam)
+
+        threading.Thread(target=input_thread, daemon=True).start()
+        threading.Thread(target=network_thread, daemon=True).start()
+
         self.update_video()
+        self.update_ui_loop()
 
     def setup_ui(self):
-        # Left Side: Video Grid
         self.video_label = tk.Label(self.root, bg="black")
         self.video_label.grid(row=0, column=0, padx=10, pady=10)
 
-        # Right Side: Control Panel
         self.panel = tk.Frame(self.root, bg="#1e1e1e")
-        self.panel.grid(row=0, column=1, sticky="n", padx=10, pady=20)
+        self.panel.grid(row=0, column=1, padx=10, pady=10, sticky="n")
 
-        # Connection Status
-        tk.Label(self.panel, text="TELEMETRY", fg="white", bg="#1e1e1e", font=("Arial", 16, "bold")).pack(pady=(0, 5))
-        self.status_indicator = tk.Label(self.panel, text="DISCONNECTED", fg="red", bg="#1e1e1e", font=("Arial", 14))
-        self.status_indicator.pack(pady=(0, 20))
+        self.canvas = tk.Canvas(self.panel, width=400, height=600, bg="#1e1e1e", highlightthickness=0)
+        self.canvas.pack()
 
-        # Thruster Status
-        tk.Label(self.panel, text="THRUSTER STATUS", fg="white", bg="#1e1e1e", font=("Arial", 16, "bold")).pack(pady=(0, 5))
-        
-        # Simple cross layout for WASD
-        self.btn_w = tk.Label(self.panel, text="W", width=4, height=2, bg="gray", font=("Arial", 14, "bold"))
-        self.btn_w.pack()
-        
-        mid_frame = tk.Frame(self.panel, bg="#1e1e1e")
-        mid_frame.pack()
-        self.btn_a = tk.Label(mid_frame, text="A", width=4, height=2, bg="gray", font=("Arial", 14, "bold"))
-        self.btn_a.grid(row=0, column=0, padx=2)
-        self.btn_s = tk.Label(mid_frame, text="S", width=4, height=2, bg="gray", font=("Arial", 14, "bold"))
-        self.btn_s.grid(row=0, column=1, padx=2)
-        self.btn_d = tk.Label(mid_frame, text="D", width=4, height=2, bg="gray", font=("Arial", 14, "bold"))
-        self.btn_d.grid(row=0, column=2, padx=2)
+        self.controller_img = Image.open("controller.png")
+        self.controller_img = self.controller_img.resize((400, 300))
+        self.controller_tk = ImageTk.PhotoImage(self.controller_img)
+        self.canvas.create_image(0, 0, anchor="nw", image=self.controller_tk)
 
-        # Emergency Stop
-        self.estop_btn = tk.Button(self.panel, text="EMERGENCY STOP", bg="red", fg="black", font=("Arial", 14, "bold"), 
-                                   command=self.emergency_stop, height=3, width=15)
-        self.estop_btn.pack(side="bottom", pady=50)
+        self.lt_rect = self.canvas.create_rectangle(50, 310, 150, 340, outline="white")
+        self.rt_rect = self.canvas.create_rectangle(250, 310, 350, 340, outline="white")
 
-    def on_press(self, event):
-        char = event.char.lower()
-        if char in self.key_state:
-            self.key_state[char] = 1
-            self.update_ui_keys()
+        self.canvas.create_text(100, 355, text="LT", fill="white", font=("Arial", 12, "bold"))
+        self.canvas.create_text(300, 355, text="RT", fill="white", font=("Arial", 12, "bold"))
 
-    def on_release(self, event):
-        char = event.char.lower()
-        if char in self.key_state:
-            self.key_state[char] = 0
-            self.update_ui_keys()
+        self.joy_center = (200, 420)
+        self.joy_radius = 40
 
-    def update_ui_keys(self):
-        # Change color to green when active
-        self.btn_w.config(bg="green" if self.key_state['w'] else "gray")
-        self.btn_a.config(bg="green" if self.key_state['a'] else "gray")
-        self.btn_s.config(bg="green" if self.key_state['s'] else "gray")
-        self.btn_d.config(bg="green" if self.key_state['d'] else "gray")
+        self.canvas.create_oval(
+            self.joy_center[0] - self.joy_radius,
+            self.joy_center[1] - self.joy_radius,
+            self.joy_center[0] + self.joy_radius,
+            self.joy_center[1] + self.joy_radius,
+            outline="white"
+        )
 
-    def emergency_stop(self):
-        print("EMERGENCY STOP TRIGGERED")
-        self.key_state = {'w': 0, 'a': 0, 's': 0, 'd': 0}
-        self.update_ui_keys()
+        self.joy_dot = self.canvas.create_oval(0, 0, 0, 0, fill="white")
 
-    def network_loop(self):
-        while self.running:
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) # Prevents command lag
-                sock.connect((PI_IP, PORT))
-                
-                self.connected = True
-                self.status_indicator.config(text="CONNECTED", fg="lime green")
-                print("Connected to Pi (control)")
-
-                while self.running and self.connected:
-                    msg = f"{self.key_state['w']},{self.key_state['a']},{self.key_state['s']},{self.key_state['d']}\n"
-                    sock.sendall(msg.encode())
-                    time.sleep(0.01) # 100Hz update rate
-
-            except Exception as e:
-                if self.connected:
-                    print("Connection lost. Retrying...")
-                self.connected = False
-                self.status_indicator.config(text="DISCONNECTED", fg="red")
-                time.sleep(1) # Wait before trying to reconnect
+        self.dpad_up_rect = self.canvas.create_rectangle(190, 500, 210, 520, fill="white")
+        self.dpad_down_rect = self.canvas.create_rectangle(190, 540, 210, 560, fill="white")
+        self.canvas.create_rectangle(170, 520, 230, 540, fill="white")
 
     def update_video(self):
         if not self.running:
             return
 
-        frames = [cam.get_frame() for cam in self.cams]
+        if len(self.cams) == 0:
+            blank = np.zeros((480, 640, 3), dtype=np.uint8)
+            img = Image.fromarray(blank)
+        else:
+            frames = [cam.get_frame() for cam in self.cams]
 
-        # Combine into 2x2 grid
-        top = cv2.hconcat([frames[0], frames[1]])
-        bottom = cv2.hconcat([frames[2], frames[3]])
-        grid = cv2.vconcat([top, bottom])
+            # Pad to 4 cameras if fewer exist
+            while len(frames) < 4:
+                frames.append(np.zeros((240, 320, 3), dtype=np.uint8))
 
-        # Convert to Tkinter image
-        img = Image.fromarray(grid)
+            top = cv2.hconcat([frames[0], frames[1]])
+            bottom = cv2.hconcat([frames[2], frames[3]])
+            grid = cv2.vconcat([top, bottom])
+
+            img = Image.fromarray(grid)
+
         imgtk = ImageTk.PhotoImage(image=img)
-        
         self.video_label.imgtk = imgtk
         self.video_label.configure(image=imgtk)
 
-        # Call this function again in 30 milliseconds (~33 FPS)
         self.root.after(30, self.update_video)
+
+    def update_ui_loop(self):
+        global lx, ly, lt, rt, dpad_up, dpad_down
+
+        self.canvas.itemconfig(self.lt_rect, fill="lime" if lt > 0.2 else "")
+        self.canvas.itemconfig(self.rt_rect, fill="lime" if rt > 0.2 else "")
+
+        cx, cy = self.joy_center
+        r = self.joy_radius
+
+        x = cx + lx * r
+        y = cy + ly * r
+
+        color = "lime" if abs(lx) > 0.1 or abs(ly) > 0.1 else "white"
+
+        self.canvas.coords(self.joy_dot, x-8, y-8, x+8, y+8)
+        self.canvas.itemconfig(self.joy_dot, fill=color)
+
+        self.canvas.itemconfig(self.dpad_up_rect, fill="lime" if dpad_up else "white")
+        self.canvas.itemconfig(self.dpad_down_rect, fill="lime" if dpad_down else "white")
+
+        self.root.after(50, self.update_ui_loop)
 
     def on_closing(self):
         self.running = False
@@ -179,9 +253,9 @@ class ROVDashboard:
             cam.stop()
         self.root.destroy()
 
-# Start the application
 if __name__ == "__main__":
     root = tk.Tk()
     app = ROVDashboard(root)
+    print("Client running. Press Ctrl+C to quit.")
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()

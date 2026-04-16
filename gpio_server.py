@@ -45,14 +45,12 @@ def update_leds(uart_status, imu_status, cam_status):
 print("Starting camera streams in the background...")
 
 # Define the 4 ustreamer commands
-ustreamer_path = "/home/cistern6-b/ustreamer/ustreamer"
 camera_commands = [
-    [ustreamer_path, "--device", "/dev/video0", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8080"],
-    [ustreamer_path, "--device", "/dev/video2", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8081"],
-    [ustreamer_path, "--device", "/dev/video4", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8082"],
-    [ustreamer_path, "--device", "/dev/video6", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8083"]
+    ["./ustreamer/ustreamer", "--device", "/dev/video0", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8080"],
+    ["./ustreamer/ustreamer", "--device", "/dev/video2", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8081"],
+    ["./ustreamer/ustreamer", "--device", "/dev/video4", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8082"],
+    ["./ustreamer/ustreamer", "--device", "/dev/video6", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8083"]
 ]
-
 
 camera_procs = []
 
@@ -72,7 +70,6 @@ for cmd in camera_commands:
         print(f"Hardware missing: {device_path} is not plugged in.")
 # Give the cameras a brief second to warm up
 time.sleep(1) 
-
 
 
 # -------------------------------
@@ -110,6 +107,7 @@ try:
 except Exception as e:
     print(f"UART Initialization Error: {e}")
 
+
 # -------------------------------
 # 🔹 SOCKET SERVER SETUP
 # -------------------------------
@@ -131,15 +129,51 @@ while True:
     except socket.timeout:
         continue
 
-# conn, addr = server.accept()
-# print("Connected from:", addr)
-
-# conn.setblocking(False) # Set socket to non-blocking mode for smoother control loop
+#conn, addr = server.accept()
+#print("Connected from:", addr)
 
 buffer = ""
 speed = 25
 last_imu_time = time.time()
 imu_send_rate = 0.1 # send data to laptop every 0.1s (10Hz)
+
+# -------------------------------
+# 🧠 STATUS HELPER FUNCTION
+# -------------------------------
+def get_status_string(lx, ly, lt, rt, dpad_up, dpad_down):
+    directions = []
+
+    threshold = 0.2
+
+    # Forward / backward
+    if ly < -threshold:
+        directions.append(f"FORWARD ({-ly:.2f})")
+    elif ly > threshold:
+        directions.append(f"BACKWARD ({ly:.2f})")
+
+    # Turning
+    if lx < -threshold:
+        directions.append(f"TURN LEFT ({-lx:.2f})")
+    elif lx > threshold:
+        directions.append(f"TURN RIGHT ({lx:.2f})")
+
+    # Vertical (triggers)
+    vertical = rt - lt
+    if vertical > threshold:
+        directions.append(f"UP ({vertical:.2f})")
+    elif vertical < -threshold:
+        directions.append(f"DOWN ({-vertical:.2f})")
+
+    # D-pad (motor 6)
+    if dpad_up > 0.5:
+        directions.append("M6 UP")
+    elif dpad_down > 0.5:
+        directions.append("M6 DOWN")
+
+    if not directions:
+        return "IDLE"
+
+    return " | ".join(directions)
 
 try:
     while True:
@@ -150,7 +184,7 @@ try:
             data = conn.recv(1024)
 
             if not data:
-                break #laptop disconnected
+                break
 
             buffer += data.decode()
 
@@ -158,17 +192,19 @@ try:
                 line, buffer = buffer.split("\n", 1)
 
                 try:
-                    w, a, s, d, q, e, r, f = [int(x) for x in line.strip().split(",")]
+                    lx, ly, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
+                    write_to_motors(lx, ly, lt, rt, r, f)
 
-                    write_to_motors(w, a, s, d, q, e, r, f, speed)
+                    status = get_status_string(lx, ly, lt, rt, r, f)
+                    print(f"\rROV STATUS: {status}        ", end="")
 
-                except ValueError:
+                except:
                     pass
         except BlockingIOError:
             pass # no data this millisecond, keep looping
         except ConnectionResetError:
             break
-        
+
         if imu and (time.time() - last_imu_time) >= imu_send_rate:
             try:
                 if imu.dataReady():
@@ -185,7 +221,7 @@ try:
             except Exception as e:
                 # 🔹 NEW: Instead of 'pass', print the error so you know exactly why it failed
                 print(f"IMU Read Error: {e}")
-        
+
 
 finally:
     print("\nShutting down ROV systems...")
