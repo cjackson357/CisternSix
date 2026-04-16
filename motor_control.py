@@ -3,46 +3,40 @@ import serial
 import time
 
 ser = serial.Serial(
-    port='/dev/serial0',  # or /dev/ttyUSB0 if using USB adapter
+    port='/dev/serial0',
     baudrate=115200,
     timeout=1
 )
 
 def send_all_motors(values):
-    """Send all 6 motor values at once. values = list of 6 ints (0-255)"""
-    parts = [f"M{i+1}:{v}" for i, v in enumerate(values)]
+    parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(values)]
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
+    time.sleep(0.02)
 
-    time.sleep(0.02)  # ~50Hz update rate
-
-
-def write_to_motors(w, a, s, d, q, e, r, f, speed):
+def write_to_motors(lx, ly, lt, rt, dpad_up, dpad_down):
     thrusters = 128 * np.ones(6)
-    if w:
-        thrusters[0:2] += speed
-        thrusters[2:4] -= 1.3 * speed
-    if a: 
-        thrusters[0] += speed
-        thrusters[2] += speed
-        thrusters[1] -= 1.3 * speed
-        thrusters[3] -= 1.3 * speed
-    if s:
-        thrusters[0:2] -= 1.3 * speed
-        thrusters[2:4] += speed
-    if d:
-        thrusters[0] -= 1.3 * speed
-        thrusters[2] -= 1.3 * speed
-        thrusters[1] += speed
-        thrusters[3] += speed
-    if q:
-        thrusters[4] += speed
-    if e:
-        thrusters[4] -= 1.3 * speed
-    if r:
-        thrusters[5] += speed
-    if f:
-        thrusters[5] -= 1.3 * speed
+
+    gain = 10
+
+    # Forward/back
+    thrusters[0:2] += -ly * gain
+    thrusters[2:4] += ly * gain
+
+    # Turning
+    thrusters[0] += lx * gain
+    thrusters[2] += lx * gain
+    thrusters[1] -= lx * gain
+    thrusters[3] -= lx * gain
+
+    # Vertical
+    thrusters[4] += (rt - lt) * gain
+
+    # D-pad
+    if dpad_up > 0.5:
+        thrusters[5] += gain
+    elif dpad_down > 0.5:
+        thrusters[5] -= gain
 
     np.clip(thrusters, 0, 255)
 

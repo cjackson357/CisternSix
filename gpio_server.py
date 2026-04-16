@@ -57,31 +57,34 @@ speed = 25
 # -------------------------------
 # 🧠 STATUS HELPER FUNCTION
 # -------------------------------
-def get_status_string(w, a, s, d, q, e, r, f):
+def get_status_string(lx, ly, lt, rt, dpad_up, dpad_down):
     directions = []
 
+    threshold = 0.2
+
     # Forward / backward
-    if w:
-        directions.append("FORWARD")
-    elif s:
-        directions.append("BACKWARD")
+    if ly < -threshold:
+        directions.append(f"FORWARD ({-ly:.2f})")
+    elif ly > threshold:
+        directions.append(f"BACKWARD ({ly:.2f})")
 
     # Turning
-    if a:
-        directions.append("TURN LEFT")
-    elif d:
-        directions.append("TURN RIGHT")
+    if lx < -threshold:
+        directions.append(f"TURN LEFT ({-lx:.2f})")
+    elif lx > threshold:
+        directions.append(f"TURN RIGHT ({lx:.2f})")
 
-    # Vertical
-    if q:
-        directions.append("UP")
-    elif e:
-        directions.append("DOWN")
+    # Vertical (triggers)
+    vertical = rt - lt
+    if vertical > threshold:
+        directions.append(f"UP ({vertical:.2f})")
+    elif vertical < -threshold:
+        directions.append(f"DOWN ({-vertical:.2f})")
 
-    # Motor 6 (D-pad)
-    if r:
+    # D-pad (motor 6)
+    if dpad_up > 0.5:
         directions.append("M6 UP")
-    elif f:
+    elif dpad_down > 0.5:
         directions.append("M6 DOWN")
 
     if not directions:
@@ -102,11 +105,10 @@ try:
             line, buffer = buffer.split("\n", 1)
 
             try:
-                w, a, s, d, q, e, r, f = [int(x) for x in line.strip().split(",")]
+                lx, ly, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
+                write_to_motors(lx, ly, lt, rt, r, f)
 
-                write_to_motors(w, a, s, d, q, e, r, f, speed)
-
-                status = get_status_string(w, a, s, d, q, e, r, f)
+                status = get_status_string(lx, ly, lt, rt, r, f)
                 print(f"\rROV STATUS: {status}        ", end="")
 
             except:
