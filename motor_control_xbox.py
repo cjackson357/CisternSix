@@ -9,12 +9,15 @@ ser = serial.Serial(
 )
 
 def send_all_motors(values):
+    # Flush any unread echoes before sending new command
+    ser.reset_input_buffer()
+    
     parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(values)]
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
-    time.sleep(0.02)
 
-    # Read echo back from Arduino
+    # Wait briefly then read one echo
+    time.sleep(0.05)
     if ser.in_waiting:
         echo = ser.readline().decode('utf-8', errors='ignore').strip()
         print(f"Arduino confirms: {echo}")
