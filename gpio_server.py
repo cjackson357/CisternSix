@@ -97,13 +97,10 @@ except Exception as e:
 print("Checking UART connection to Arduino...")
 arduino_ok = False
 try:
-    # /dev/serial0 is the Pi's default hardware UART alias (GPIO 14 & 15)
-    arduino_serial = serial.Serial('/dev/serial0', baudrate=115200, timeout=1)
-    arduino_ok = arduino_serial.is_open
+    from motor_control_xbox import ser  # reuse the already-open port
+    arduino_ok = ser.is_open
     if arduino_ok:
         print("UART to Arduino successfully opened!")
-        # If motor_control.py needs to open this port itself, uncomment the next line:
-        # arduino_serial.close() 
 except Exception as e:
     print(f"UART Initialization Error: {e}")
 
