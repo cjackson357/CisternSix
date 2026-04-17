@@ -10,7 +10,7 @@ ser = serial.Serial(
 
 def send_all_motors(values):
     """Send all 6 motor values at once. values = list of 6 ints (0-255)"""
-    parts = [f"M{i+1}:{v}" for i, v in enumerate(values)]
+    parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(values)]
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
 
