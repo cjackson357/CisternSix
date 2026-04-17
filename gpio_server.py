@@ -6,7 +6,7 @@ import subprocess
 import time
 import sys
 import qwiic_icm20948
-from motor_control import write_to_motors
+from motor_control_xbox import write_to_motors
 
 PORT = 5005
 
