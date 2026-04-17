@@ -1,12 +1,8 @@
-#include <Servo.h>
+String inputBuffer = "";
 
 void setup() {
   Serial.begin(115200);
-  delay(100);
-  Serial.println("READY");
 }
-
-String inputBuffer = "";
 
 void loop() {
   while (Serial.available()) {
