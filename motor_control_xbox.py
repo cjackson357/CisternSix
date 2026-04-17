@@ -3,26 +3,28 @@ import serial
 import time
 
 ser = serial.Serial(
-    port='/dev/serial0',  # or /dev/ttyUSB0 if using USB adapter
+    port='/dev/serial0',
     baudrate=115200,
     timeout=1
 )
 
 def send_all_motors(values):
-    """Send all 6 motor values at once. values = list of 6 ints (0-255)"""
     parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(values)]
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
+    time.sleep(0.02)
 
-    time.sleep(0.02)  # ~50Hz update rate
-
+    # Read echo back from Arduino
+    if ser.in_waiting:
+        echo = ser.readline().decode('utf-8', errors='ignore').strip()
+        print(f"Arduino confirms: {echo}")
 
 def write_to_motors(w, a, s, d, q, e, r, f, speed):
     thrusters = 128 * np.ones(6)
     if w:
         thrusters[0:2] += speed
         thrusters[2:4] -= 1.3 * speed
-    if a: 
+    if a:
         thrusters[0] += speed
         thrusters[2] += speed
         thrusters[1] -= 1.3 * speed
@@ -45,7 +47,4 @@ def write_to_motors(w, a, s, d, q, e, r, f, speed):
         thrusters[5] -= 1.3 * speed
 
     thrusters = np.clip(thrusters, 0, 255)
-
-    print(thrusters)
-
     send_all_motors(thrusters)

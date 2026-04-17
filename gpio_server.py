@@ -97,10 +97,21 @@ except Exception as e:
 print("Checking UART connection to Arduino...")
 arduino_ok = False
 try:
-    from motor_control_xbox import ser  # reuse the already-open port
-    arduino_ok = ser.is_open
-    if arduino_ok:
-        print("UART to Arduino successfully opened!")
+    from motor_control_xbox import ser  # reuse already-open port
+    print("Pinging Arduino...")
+    while True:
+        ser.write(b"PING\n")
+        time.sleep(0.5)
+        if ser.in_waiting:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line == "PONG":
+                arduino_ok = True
+                print("Arduino handshake successful!")
+                break
+            else:
+                print(f"Unexpected response: '{line}', retrying...")
+        else:
+            print("No response, retrying...")
 except Exception as e:
     print(f"UART Initialization Error: {e}")
 
