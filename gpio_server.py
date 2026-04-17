@@ -195,6 +195,7 @@ try:
 
                 try:
                     lx, ly, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
+                    print(lx)
                     write_to_motors(
                         w=ly > 0.2,
                         a=lx < -0.2,
