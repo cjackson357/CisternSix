@@ -184,6 +184,7 @@ try:
             data = conn.recv(1024)
 
             if not data:
+                print("no data")
                 break
 
             buffer += data.decode()
@@ -193,10 +194,19 @@ try:
 
                 try:
                     lx, ly, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
-                    write_to_motors(lx, ly, lt, rt, r, f)
+                    write_to_motors(
+                        w=ly > 0.2,
+                        a=lx < -0.2,
+                        s=ly < -0.2,
+                        d=lx > 0.2,
+                        q=lt > 0.2,
+                        e=rt > 0.2,
+                        r=r > 0.5,
+                        f=f > 0.5,
+                        speed=25
+                    )
 
                     status = get_status_string(lx, ly, lt, rt, r, f)
-                    print(f"\rROV STATUS: {status}        ", end="")
 
                 except:
                     pass
