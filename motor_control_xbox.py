@@ -5,22 +5,20 @@ import time
 ser = serial.Serial(
     port='/dev/serial0',
     baudrate=115200,
-    timeout=1
+    timeout=0  # non-blocking
 )
 
 def send_all_motors(values):
-    # Flush any unread echoes before sending new command
     ser.reset_input_buffer()
-    
     parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(values)]
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
 
-    # Wait briefly then read one echo
-    time.sleep(0.05)
+    # Non-blocking read — don't wait for echo, just grab it if it's there
     if ser.in_waiting:
         echo = ser.readline().decode('utf-8', errors='ignore').strip()
-        print(f"Arduino confirms: {echo}")
+        if echo:
+            print(f"Arduino confirms: {echo}", flush=True)
 
 def write_to_motors(w, a, s, d, q, e, r, f, speed):
     thrusters = 128 * np.ones(6)

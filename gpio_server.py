@@ -185,7 +185,7 @@ def get_status_string(lx, ly, lt, rt, dpad_up, dpad_down):
 
 try:
     while True:
-        time.sleep(0.01)
+        time.sleep(0.005)
         update_leds(arduino_ok, imu_ok, cams_ok) #update indicators at top of loop
 
         try:
