@@ -12,12 +12,16 @@ def uart_handshake():
     print("Pinging Arduino...")
     while True:
         ser.write(b"PING\n")
+        time.sleep(0.5)  # wait for Arduino to respond
         if ser.in_waiting:
             line = ser.readline().decode('utf-8', errors='ignore').strip()
+            print(f"Received: '{line}'")
             if line == "PONG":
                 print("Handshake successful!")
                 return ser
-        time.sleep(1)
+        else:
+            print("No response, retrying...")
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     ser = uart_handshake()
