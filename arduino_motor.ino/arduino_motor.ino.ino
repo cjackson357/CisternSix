@@ -1,20 +1,28 @@
 #include <Servo.h>
 
-// ESC on pins 3, 5, 6, 9, 10 — DC motor on pin 11
+// ESC on pins 3, 5, 6, 9, 10 — Brushed motor on pin 11
 Servo esc[5];
 const int ESC_PINS[5] = {3, 5, 6, 9, 10};
-const int DC_PIN = 11;
+
+const int DC_PWM_PIN = 11;
+const int DC_DIR_PIN1 = 12;
+const int DC_DIR_PIN2 = 13;
 
 void setup() {
   Serial.begin(115200);
 
   for (int i = 0; i < 5; i++) {
-    esc[i].attach(ESC_PINS[i], 1000, 2000); // min 1000us, max 2000us
-    esc[i].writeMicroseconds(1000);          // send idle/arm signal
+    esc[i].attach(ESC_PINS[i], 1000, 2000);
+    esc[i].writeMicroseconds(1000);
   }
 
-  pinMode(DC_PIN, OUTPUT);
-  analogWrite(DC_PIN, 0);
+  pinMode(DC_PWM_PIN, OUTPUT);
+  pinMode(DC_DIR_PIN1, OUTPUT);
+  pinMode(DC_DIR_PIN2, OUTPUT);
+
+  analogWrite(DC_PWM_PIN, 0);
+  digitalWrite(DC_DIR_PIN1, LOW);
+  digitalWrite(DC_DIR_PIN2, LOW);
 }
 
 String inputBuffer = "";
@@ -40,16 +48,39 @@ void parseCommand(String cmd) {
     if (token.charAt(0) == 'M') {
       int colon = token.indexOf(':');
       if (colon != -1) {
-        int motorId = token.substring(1, colon).toInt() - 1; // 0-indexed
+        int motorId = token.substring(1, colon).toInt() - 1;
         int value   = token.substring(colon + 1).toInt();
 
         if (motorId >= 0 && motorId < 5) {
-          // ESCs: Pi sends 0-255, map to 1000-2000us
+          // ESC motors
           int us = map(value, 0, 255, 1000, 2000);
           esc[motorId].writeMicroseconds(constrain(us, 1000, 2000));
-        } else if (motorId == 5) {
-          // DC motor: use raw 0-255
-          analogWrite(DC_PIN, constrain(value, 0, 255));
+        } 
+        else if (motorId == 5) {
+          // Brushed motor with direction
+
+          value = constrain(value, 0, 255);
+
+          if (value == 128) {
+            // STOP
+            analogWrite(DC_PWM_PIN, 0);
+            digitalWrite(DC_DIR_PIN1, LOW);
+            digitalWrite(DC_DIR_PIN2, LOW);
+          } 
+          else if (value > 128) {
+            // FORWARD
+            int speed = map(value, 129, 255, 0, 255);
+            digitalWrite(DC_DIR_PIN1, HIGH);
+            digitalWrite(DC_DIR_PIN2, LOW);
+            analogWrite(DC_PWM_PIN, speed);
+          } 
+          else {
+            // REVERSE
+            int speed = map(value, 0, 127, 255, 0);
+            digitalWrite(DC_DIR_PIN1, LOW);
+            digitalWrite(DC_DIR_PIN2, HIGH);
+            analogWrite(DC_PWM_PIN, speed);
+          }
         }
       }
     }
