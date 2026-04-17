@@ -189,6 +189,7 @@ try:
 
             buffer += data.decode()
 
+            print("\n" in buffer)
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
 
