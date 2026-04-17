@@ -208,8 +208,8 @@ try:
 
                     status = get_status_string(lx, ly, lt, rt, r, f)
 
-                except:
-                    pass
+                except Exception as e:
+                    print(f"An error occured: {e}")
         except BlockingIOError:
             pass # no data this millisecond, keep looping
         except ConnectionResetError:
