@@ -8,7 +8,7 @@ import time
 from inputs import get_gamepad
 import urllib.request
 
-PI_IP = "192.168.137.2"
+PI_IP = "192.168.1.3"
 PORT = 5005
 
 DEADZONE = 0.1
@@ -105,7 +105,8 @@ class CameraStream:
 
     def check_stream(self):
         try:
-            urllib.request.urlopen(self.url, timeout=1)
+            snapshot_url = self.url.replace("?action=stream", "?action=snapshot")
+            urllib.request.urlopen(snapshot_url, timeout=3)
             return True
         except:
             return False
