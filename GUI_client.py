@@ -19,6 +19,7 @@ def apply_deadzone(val):
 # Controller state
 lx = 0
 ly = 0
+rx = 0
 lt = 0
 rt = 0
 dpad_up = 0
@@ -28,7 +29,7 @@ dpad_down = 0
 # 🎮 INPUT THREAD
 # -------------------------------
 def input_thread():
-    global lx, ly, lt, rt, dpad_up, dpad_down
+    global lx, ly, rx, lt, rt, dpad_up, dpad_down
     while True:
         events = get_gamepad()
         for event in events:
@@ -36,6 +37,8 @@ def input_thread():
                 lx = apply_deadzone(event.state / 32768)
             elif event.code == 'ABS_Y':
                 ly = apply_deadzone(-event.state / 32768)
+            elif event.code == 'ABS_RX':
+                rx = apply_deadzone(event.state / 32768)
             elif event.code == 'ABS_Z':
                 lt = event.state / 255
             elif event.code == 'ABS_RZ':
@@ -48,7 +51,7 @@ def input_thread():
 # 🌐 NETWORK THREAD
 # -------------------------------
 def network_thread():
-    global lx, ly, lt, rt, dpad_up, dpad_down
+    global lx, ly, rx, lt, rt, dpad_up, dpad_down
 
     while True:
         try:
@@ -60,7 +63,7 @@ def network_thread():
             buffer = ""
 
             while True:
-                msg = f"{lx},{ly},{lt},{rt},{dpad_up},{dpad_down}\n"
+                msg = f"{lx},{ly},{rx},{lt},{rt},{dpad_up},{dpad_down}\n"
                 sock.sendall(msg.encode())
 
                 try:
@@ -227,7 +230,7 @@ class ROVDashboard:
         self.root.after(30, self.update_video)
 
     def update_ui_loop(self):
-        global lx, ly, lt, rt, dpad_up, dpad_down
+        global lx, ly, rx, lt, rt, dpad_up, dpad_down
 
         self.canvas.itemconfig(self.lt_rect, fill="lime" if lt > 0.2 else "")
         self.canvas.itemconfig(self.rt_rect, fill="lime" if rt > 0.2 else "")

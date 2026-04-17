@@ -20,23 +20,33 @@ def send_all_motors(values):
         if echo:
             print(f"Arduino confirms: {echo}", flush=True)
 
-def write_to_motors(w, a, s, d, q, e, r, f, speed):
+def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
     thrusters = 128 * np.ones(6)
     if w:
         thrusters[0:2] += speed
         thrusters[2:4] -= 1.3 * speed
-    if a:
+    if a: # Strafe Left (Motors on each side the same)
+        thrusters[0] -= 1.3 * speed
+        thrusters[2] -= 1.3 * speed
+        thrusters[1] += speed
+        thrusters[3] += speed
+    if s:
+        thrusters[0:2] -= 1.3 * speed
+        thrusters[2:4] += speed
+    if d: # Strafe Right (Motors on each side the same)
         thrusters[0] += speed
         thrusters[2] += speed
         thrusters[1] -= 1.3 * speed
         thrusters[3] -= 1.3 * speed
-    if s:
-        thrusters[0:2] -= 1.3 * speed
-        thrusters[2:4] += speed
-    if d:
+    if turn_left: # Turn Left (Motors on each side opposite)
         thrusters[0] -= 1.3 * speed
-        thrusters[2] -= 1.3 * speed
+        thrusters[2] += speed
         thrusters[1] += speed
+        thrusters[3] -= 1.3 * speed
+    if turn_right: # Turn Right (Motors on each side opposite)
+        thrusters[0] += speed
+        thrusters[2] -= 1.3 * speed
+        thrusters[1] -= 1.3 * speed
         thrusters[3] += speed
     if q:
         thrusters[4] += speed

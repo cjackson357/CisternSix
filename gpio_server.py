@@ -148,22 +148,28 @@ imu_send_rate = 0.1 # send data to laptop every 0.1s (10Hz)
 # -------------------------------
 # 🧠 STATUS HELPER FUNCTION
 # -------------------------------
-def get_status_string(lx, ly, lt, rt, dpad_up, dpad_down):
+def get_status_string(lx, ly, rx, lt, rt, dpad_up, dpad_down):
     directions = []
 
     threshold = 0.2
 
     # Forward / backward
-    if ly < -threshold:
-        directions.append(f"FORWARD ({-ly:.2f})")
-    elif ly > threshold:
-        directions.append(f"BACKWARD ({ly:.2f})")
+    if ly > threshold:
+        directions.append(f"FORWARD ({ly:.2f})")
+    elif ly < -threshold:
+        directions.append(f"BACKWARD ({-ly:.2f})")
 
-    # Turning
+    # Strafe left / right
     if lx < -threshold:
-        directions.append(f"TURN LEFT ({-lx:.2f})")
+        directions.append(f"STRAFE LEFT ({-lx:.2f})")
     elif lx > threshold:
-        directions.append(f"TURN RIGHT ({lx:.2f})")
+        directions.append(f"STRAFE RIGHT ({lx:.2f})")
+    
+    # Turn
+    if rx < -threshold:
+        directions.append(f"TURN LEFT ({-rx:.2f})")
+    elif rx > threshold:
+        directions.append(f"TURN RIGHT ({rx:.2f})")
 
     # Vertical (triggers)
     vertical = rt - lt
@@ -202,12 +208,14 @@ try:
                 line, buffer = buffer.split("\n", 1)
 
                 try:
-                    lx, ly, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
+                    lx, ly, rx, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
                     write_to_motors(
                         w=ly > 0.2,
                         a=lx < -0.2,
                         s=ly < -0.2,
                         d=lx > 0.2,
+                        turn_left=rx < -0.2,
+                        turn_right=rx > 0.2,
                         q=lt > 0.2,
                         e=rt > 0.2,
                         r=r > 0.5,
@@ -215,7 +223,7 @@ try:
                         speed=25
                     )
 
-                    status = get_status_string(lx, ly, lt, rt, r, f)
+                    status = get_status_string(lx, ly, rx, lt, rt, r, f)
 
                 except Exception as e:
                     print(f"An error occured: {e}")
@@ -247,7 +255,7 @@ finally:
     GPIO.cleanup()
 
     try:
-        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, speed) # Stop all motors
+        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, speed)  # Stop all motors
     except:
         pass
     
