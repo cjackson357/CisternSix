@@ -61,13 +61,13 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
     if f:
         thrusters[5] -= 1.3 * speed
 
-    index = [4, 2, 0, 3, 1]
+    index = [4, 2, 0, 3, 1, 5]
     thrusters = thrusters[index]
 
     thrusters = np.clip(thrusters, 0, 255)
 
     # Ramp toward target instead of jumping instantly
-    step = 5  # max change per update — tune this
+    step = 1  # max change per update — tune this
     current_thrusters = np.clip(
         thrusters,
         current_thrusters - step,
