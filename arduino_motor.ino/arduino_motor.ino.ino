@@ -1,15 +1,15 @@
 #include <Servo.h>
 
-#include <Servo.h>
-
 Servo esc[5];
-Servo dcMotor;  // treat DC motor as servo too
+Servo dcMotor;
 
 const int ESC_PINS[5] = {3, 5, 6, 9, 10};
-const int DC_PIN = 11;  // now safe since Servo library manages it
-
+const int DC_PIN = 11;
 const int DC_DIR_PIN1 = 12;
 const int DC_DIR_PIN2 = 13;
+
+bool handshakeDone = false;
+String inputBuffer = "";
 
 void setup() {
   Serial.begin(115200);
@@ -22,7 +22,7 @@ void setup() {
   }
 
   dcMotor.attach(DC_PIN, 1000, 2000);
-  dcMotor.writeMicroseconds(1500);  // neutral
+  dcMotor.writeMicroseconds(1500);
 
   pinMode(DC_DIR_PIN1, OUTPUT);
   pinMode(DC_DIR_PIN2, OUTPUT);
@@ -30,9 +30,13 @@ void setup() {
   digitalWrite(DC_DIR_PIN2, LOW);
 }
 
-String inputBuffer = "";
-
 void loop() {
+  if (inputBuffer.length() > 60) {
+    inputBuffer = "";
+    Serial.println("BUFFER_OVERFLOW");
+    return;
+  }
+
   while (Serial.available()) {
     char c = (char)Serial.read();
     if (c == '\n') {
@@ -77,7 +81,7 @@ void parseCommand(String cmd) {
           motorValues[5] = value;
 
           if (value == 128) {
-            dcMotor.writeMicroseconds(1500);  // neutral/stop
+            dcMotor.writeMicroseconds(1500);
             digitalWrite(DC_DIR_PIN1, LOW);
             digitalWrite(DC_DIR_PIN2, LOW);
           }
@@ -88,7 +92,7 @@ void parseCommand(String cmd) {
             dcMotor.writeMicroseconds(us);
           }
           else {
-            int us = map(value, 0, 127, 2000, 1500);  // reversed
+            int us = map(value, 0, 127, 2000, 1500);
             digitalWrite(DC_DIR_PIN1, LOW);
             digitalWrite(DC_DIR_PIN2, HIGH);
             dcMotor.writeMicroseconds(us);
@@ -101,7 +105,6 @@ void parseCommand(String cmd) {
     start = comma + 1;
   }
 
-  // Send echo back to Pi
   for (int i = 0; i < 6; i++) {
     echo += "M" + String(i + 1) + ":" + String(motorValues[i]);
     if (i < 5) echo += ",";
