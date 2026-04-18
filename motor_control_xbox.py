@@ -33,17 +33,6 @@ def do_handshake():
                 return
         print("Waiting for Arduino...")
 
-def do_handshake():
-    while True:
-        ser.write(b"PING\n")
-        time.sleep(0.5)
-        if ser.in_waiting:
-            line = ser.readline().decode('utf-8', errors='ignore').strip()
-            if line == "PONG":
-                print("Handshake restored!")
-                return
-        print("Waiting for Arduino...")
-
 current_thrusters = 128 * np.ones(6)  # global state
 
 def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
@@ -90,13 +79,26 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
 
     thrusters = np.clip(thrusters, 0, 255)
 
-    # Ramp toward target instead of jumping instantly
-    step = 1  # max change per update — tune this
-    current_thrusters = np.clip(
-        thrusters,
-        current_thrusters - step,
-        current_thrusters + step
-    )
+    crossing = (current_thrusters - 128) * (target - 128) < 0
+    
+    if crossing.any():
+        # Ramp to neutral first
+        neutral = np.ones(6) * 128
+        current_thrusters = np.clip(
+            neutral,
+            current_thrusters - step,
+            current_thrusters + step
+        )
+    else:
+        # Normal ramp toward target
+        current_thrusters = np.clip(
+            thrusters,
+            current_thrusters - step,
+            current_thrusters + step
+        )
+    
+    send_all_motors(current_thrusters)
+
     send_all_motors(thrusters)
 
     
