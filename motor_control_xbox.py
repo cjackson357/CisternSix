@@ -79,8 +79,9 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
 
     thrusters = np.clip(thrusters, 0, 255)
 
-    crossing = (current_thrusters - 128) * (target - 128) < 0
+    crossing = (current_thrusters - 128) * (thrusters - 128) < 0
     
+    step = 1
     if crossing.any():
         # Ramp to neutral first
         neutral = np.ones(6) * 128
