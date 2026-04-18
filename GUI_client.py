@@ -11,7 +11,7 @@ import urllib.request
 PI_IP = "192.168.1.3"
 PORT = 5005
 
-DEADZONE = 0.1
+DEADZONE = 0.2
 
 def apply_deadzone(val):
     return val if abs(val) > DEADZONE else 0
