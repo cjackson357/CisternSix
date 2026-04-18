@@ -20,9 +20,9 @@ def send_all_motors(values):
         if echo:
             print(f"Arduino confirms: {echo}", flush=True)
 
-current_thrusters = 128 * np.ones(6)  # global state
+current_thrusters = 128 * np.ones(6)
 
-def write_to_motors(w, a, s, d, q, e, r, f, speed):
+def write_to_motors(w, a, s, d, turn_left, turn_right, q, e, r, f, speed):
     global current_thrusters
     
     target = 128 * np.ones(6)
@@ -30,17 +30,27 @@ def write_to_motors(w, a, s, d, q, e, r, f, speed):
         target[0:2] += speed
         target[2:4] -= 1.3 * speed
     if a:
-        target[0] += speed
-        target[2] += speed
-        target[1] -= 1.3 * speed
-        target[3] -= 1.3 * speed
+        target[0] -= 1.3 * speed
+        target[2] -= 1.3 * speed
+        target[1] += speed
+        target[3] += speed
     if s:
         target[0:2] -= 1.3 * speed
         target[2:4] += speed
     if d:
+        target[0] += speed
+        target[2] += speed
+        target[1] -= 1.3 * speed
+        target[3] -= 1.3 * speed
+    if turn_left:
         target[0] -= 1.3 * speed
-        target[2] -= 1.3 * speed
+        target[2] += speed
         target[1] += speed
+        target[3] -= 1.3 * speed
+    if turn_right:
+        target[0] += speed
+        target[2] -= 1.3 * speed
+        target[1] -= 1.3 * speed
         target[3] += speed
     if q:
         target[4] += speed
@@ -51,17 +61,16 @@ def write_to_motors(w, a, s, d, q, e, r, f, speed):
     if f:
         target[5] -= 1.3 * speed
 
+    index = [4, 2, 0, 3, 1]
+    target = target[index]
+
     target = np.clip(target, 0, 255)
-    
-    # Ramp toward target instead of jumping instantly
-    step = 5  # max change per update — tune this
+
+    step = 5
     current_thrusters = np.clip(
         target,
         current_thrusters - step,
         current_thrusters + step
     )
 
-    index = [4, 2, 0, 3, 1]
-    thrusters = thrusters[index]
-    
     send_all_motors(current_thrusters)
