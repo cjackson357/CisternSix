@@ -20,45 +20,48 @@ def send_all_motors(values):
         if echo:
             print(f"Arduino confirms: {echo}", flush=True)
 
-def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
-    thrusters = 128 * np.ones(6)
+current_thrusters = 128 * np.ones(6)  # global state
+
+def write_to_motors(w, a, s, d, q, e, r, f, speed):
+    global current_thrusters
+    
+    target = 128 * np.ones(6)
     if w:
-        thrusters[0:2] += speed
-        thrusters[2:4] -= 1.3 * speed
-    if a: # Strafe Left (Motors on each side the same)
-        thrusters[0] -= 1.3 * speed
-        thrusters[2] -= 1.3 * speed
-        thrusters[1] += speed
-        thrusters[3] += speed
+        target[0:2] += speed
+        target[2:4] -= 1.3 * speed
+    if a:
+        target[0] += speed
+        target[2] += speed
+        target[1] -= 1.3 * speed
+        target[3] -= 1.3 * speed
     if s:
-        thrusters[0:2] -= 1.3 * speed
-        thrusters[2:4] += speed
-    if d: # Strafe Right (Motors on each side the same)
-        thrusters[0] += speed
-        thrusters[2] += speed
-        thrusters[1] -= 1.3 * speed
-        thrusters[3] -= 1.3 * speed
-    if turn_left: # Turn Left (Motors on each side opposite)
-        thrusters[0] -= 1.3 * speed
-        thrusters[2] += speed
-        thrusters[1] += speed
-        thrusters[3] -= 1.3 * speed
-    if turn_right: # Turn Right (Motors on each side opposite)
-        thrusters[0] += speed
-        thrusters[2] -= 1.3 * speed
-        thrusters[1] -= 1.3 * speed
-        thrusters[3] += speed
+        target[0:2] -= 1.3 * speed
+        target[2:4] += speed
+    if d:
+        target[0] -= 1.3 * speed
+        target[2] -= 1.3 * speed
+        target[1] += speed
+        target[3] += speed
     if q:
-        thrusters[4] += speed
+        target[4] += speed
     if e:
-        thrusters[4] -= 1.3 * speed
+        target[4] -= 1.3 * speed
     if r:
-        thrusters[5] += speed
+        target[5] += speed
     if f:
-        thrusters[5] -= 1.3 * speed
+        target[5] -= 1.3 * speed
+
+    target = np.clip(target, 0, 255)
+    
+    # Ramp toward target instead of jumping instantly
+    step = 5  # max change per update — tune this
+    current_thrusters = np.clip(
+        target,
+        current_thrusters - step,
+        current_thrusters + step
+    )
 
     index = [4, 2, 0, 3, 1]
     thrusters = thrusters[index]
-
-    thrusters = np.clip(thrusters, 0, 255)
-    send_all_motors(thrusters)
+    
+    send_all_motors(current_thrusters)
