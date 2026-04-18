@@ -14,11 +14,35 @@ def send_all_motors(values):
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
 
-    # Non-blocking read — don't wait for echo, just grab it if it's there
     if ser.in_waiting:
         echo = ser.readline().decode('utf-8', errors='ignore').strip()
-        if echo:
+        if echo == "READY":  # Arduino rebooted!
+            print("Arduino reset detected — redoing handshake...")
+            do_handshake()
+        elif echo:
             print(f"Arduino confirms: {echo}", flush=True)
+
+def do_handshake():
+    while True:
+        ser.write(b"PING\n")
+        time.sleep(0.5)
+        if ser.in_waiting:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line == "PONG":
+                print("Handshake restored!")
+                return
+        print("Waiting for Arduino...")
+
+def do_handshake():
+    while True:
+        ser.write(b"PING\n")
+        time.sleep(0.5)
+        if ser.in_waiting:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line == "PONG":
+                print("Handshake restored!")
+                return
+        print("Waiting for Arduino...")
 
 current_thrusters = 128 * np.ones(6)  # global state
 

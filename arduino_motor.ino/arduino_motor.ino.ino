@@ -11,6 +11,8 @@ bool handshakeDone = false;
 
 void setup() {
   Serial.begin(115200);
+  delay(100);
+  Serial.println("READY");  // Pi detects this and redoes handshake
 
   for (int i = 0; i < 5; i++) {
     esc[i].attach(ESC_PINS[i], 1000, 2000);
