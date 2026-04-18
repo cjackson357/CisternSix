@@ -22,54 +22,34 @@ def send_all_motors(values):
 
 def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
     thrusters = 128 * np.ones(6)
-    # if w:
-    #     thrusters[0:2] += speed
-    #     thrusters[2:4] -= 1.3 * speed
-    # if a: # Strafe Left (Motors on each side the same)
-    #     thrusters[0] -= 1.3 * speed
-    #     thrusters[2] -= 1.3 * speed
-    #     thrusters[1] += speed
-    #     thrusters[3] += speed
-    # if s:
-    #     thrusters[0:2] -= 1.3 * speed
-    #     thrusters[2:4] += speed
-    # if d: # Strafe Right (Motors on each side the same)
-    #     thrusters[0] += speed
-    #     thrusters[2] += speed
-    #     thrusters[1] -= 1.3 * speed
-    #     thrusters[3] -= 1.3 * speed
-    # if turn_left: # Turn Left (Motors on each side opposite)
-    #     thrusters[0] -= 1.3 * speed
-    #     thrusters[2] += speed
-    #     thrusters[1] += speed
-    #     thrusters[3] -= 1.3 * speed
-    # if turn_right: # Turn Right (Motors on each side opposite)
-    #     thrusters[0] += speed
-    #     thrusters[2] -= 1.3 * speed
-    #     thrusters[1] -= 1.3 * speed
-    #     thrusters[3] += speed
-    # if q:
-    #     thrusters[4] += speed
-    # if e:
-    #     thrusters[4] -= 1.3 * speed
-    # if r:
-    #     thrusters[5] += speed
-    # if f:
-    #     thrusters[5] -= 1.3 * speed
     if w:
-        thrusters[0] += speed
+        thrusters[0:2] += speed
+        thrusters[2:4] -= 1.3 * speed
     if a: # Strafe Left (Motors on each side the same)
+        thrusters[0] -= 1.3 * speed
+        thrusters[2] -= 1.3 * speed
         thrusters[1] += speed
-    if s:
-        thrusters[2] += speed
-    if d: # Strafe Right (Motors on each side the same)
         thrusters[3] += speed
-    if turn_left: # Turn Left (Motors on each side opposite)
-        thrusters[4] += speed
-    if turn_right: # Turn Right (Motors on each side opposite)
-        thrusters[5] += speed
-    if q:
+    if s:
+        thrusters[0:2] -= 1.3 * speed
+        thrusters[2:4] += speed
+    if d: # Strafe Right (Motors on each side the same)
         thrusters[0] += speed
+        thrusters[2] += speed
+        thrusters[1] -= 1.3 * speed
+        thrusters[3] -= 1.3 * speed
+    if turn_left: # Turn Left (Motors on each side opposite)
+        thrusters[0] -= 1.3 * speed
+        thrusters[2] += speed
+        thrusters[1] += speed
+        thrusters[3] -= 1.3 * speed
+    if turn_right: # Turn Right (Motors on each side opposite)
+        thrusters[0] += speed
+        thrusters[2] -= 1.3 * speed
+        thrusters[1] -= 1.3 * speed
+        thrusters[3] += speed
+    if q:
+        thrusters[4] += speed
     if e:
         thrusters[4] -= 1.3 * speed
     if r:
