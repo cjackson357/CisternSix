@@ -1,29 +1,31 @@
 #include <Servo.h>
 
-Servo esc[5];
-const int ESC_PINS[5] = {3, 5, 6, 9, 10};
+#include <Servo.h>
 
-const int DC_PWM_PIN = 11;
+Servo esc[5];
+Servo dcMotor;  // treat DC motor as servo too
+
+const int ESC_PINS[5] = {3, 5, 6, 9, 10};
+const int DC_PIN = 11;  // now safe since Servo library manages it
+
 const int DC_DIR_PIN1 = 12;
 const int DC_DIR_PIN2 = 13;
-
-bool handshakeDone = false;
 
 void setup() {
   Serial.begin(115200);
   delay(100);
-  Serial.println("READY");  // Pi detects this and redoes handshake
+  Serial.println("READY");
 
   for (int i = 0; i < 5; i++) {
     esc[i].attach(ESC_PINS[i], 1000, 2000);
     esc[i].writeMicroseconds(1000);
   }
 
-  pinMode(DC_PWM_PIN, OUTPUT);
+  dcMotor.attach(DC_PIN, 1000, 2000);
+  dcMotor.writeMicroseconds(1500);  // neutral
+
   pinMode(DC_DIR_PIN1, OUTPUT);
   pinMode(DC_DIR_PIN2, OUTPUT);
-
-  analogWrite(DC_PWM_PIN, 0);
   digitalWrite(DC_DIR_PIN1, LOW);
   digitalWrite(DC_DIR_PIN2, LOW);
 }
@@ -75,21 +77,21 @@ void parseCommand(String cmd) {
           motorValues[5] = value;
 
           if (value == 128) {
-            analogWrite(DC_PWM_PIN, 0);
+            dcMotor.writeMicroseconds(1500);  // neutral/stop
             digitalWrite(DC_DIR_PIN1, LOW);
             digitalWrite(DC_DIR_PIN2, LOW);
           }
           else if (value > 128) {
-            int speed = map(value, 129, 255, 0, 255);
+            int us = map(value, 129, 255, 1500, 2000);
             digitalWrite(DC_DIR_PIN1, HIGH);
             digitalWrite(DC_DIR_PIN2, LOW);
-            analogWrite(DC_PWM_PIN, speed);
+            dcMotor.writeMicroseconds(us);
           }
           else {
-            int speed = map(value, 0, 127, 255, 0);
+            int us = map(value, 0, 127, 2000, 1500);  // reversed
             digitalWrite(DC_DIR_PIN1, LOW);
             digitalWrite(DC_DIR_PIN2, HIGH);
-            analogWrite(DC_PWM_PIN, speed);
+            dcMotor.writeMicroseconds(us);
           }
         }
       }
