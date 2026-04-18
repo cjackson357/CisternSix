@@ -77,8 +77,8 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
     if f:
         thrusters[5] -= 1.3 * speed
 
-    # index = []
-    # thrusters = thrusters[index]
+    index = [4, 2, 0, 3, 1]
+    thrusters = thrusters[index]
 
     thrusters = np.clip(thrusters, 0, 255)
     send_all_motors(thrusters)
