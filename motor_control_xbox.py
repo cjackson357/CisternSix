@@ -99,7 +99,4 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
         )
     
     send_all_motors(current_thrusters)
-
-    send_all_motors(thrusters)
-
     
