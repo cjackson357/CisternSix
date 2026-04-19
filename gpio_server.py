@@ -13,29 +13,14 @@ PORT = 5005
 # -------------------------------
 # 🔹 GPIO & LED SETUP
 # -------------------------------
-#D1, D2, D3 = 23, 24, 25
-D1, D2, D3 = 24, 23, 25 # D1=UART, D2=IMU, D3=Cameras (seems like D1 and D2 are swapped)
+D1, D2, D3 = 24, 23, 25
 GPIO.setmode(GPIO.BCM)
 GPIO.setup([D1, D2, D3], GPIO.OUT)
 
-# State tracking for LEDs
-led_states = {D1: False, D2: False, D3: False}
-
 def update_leds(uart_status, imu_status, cam_status):
-    """
-    Sets LEDs to Solid if connected, or Blinks if disconnected.
-    Note: In a high-speed loop, 'blinking' requires a toggle check.
-    """
-    # Simple toggle for blinking effect when status is False
-    blink_tick = int(time.time() * 5) % 2 == 0 
-    
-    # D1 - UART (Simulated by checking if we have a socket connection or serial)
+    blink_tick = int(time.time() * 5) % 2 == 0
     GPIO.output(D1, GPIO.HIGH if uart_status else (GPIO.HIGH if blink_tick else GPIO.LOW))
-    
-    # D2 - IMU 
     GPIO.output(D2, GPIO.HIGH if imu_status else (GPIO.HIGH if blink_tick else GPIO.LOW))
-    
-    # D3 - Cameras
     GPIO.output(D3, GPIO.HIGH if cam_status else (GPIO.HIGH if blink_tick else GPIO.LOW))
 
 
@@ -44,17 +29,13 @@ def update_leds(uart_status, imu_status, cam_status):
 # -------------------------------
 print("Starting camera streams in the background...")
 
-# Define the 4 ustreamer commands
 camera_commands = [
     ["./ustreamer/ustreamer", "--device", "/dev/video0", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8080"],
     ["./ustreamer/ustreamer", "--device", "/dev/video2", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8081"],
     ["./ustreamer/ustreamer", "--device", "/dev/video4", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8082"],
-    ["./ustreamer/ustreamer", "--device", "/dev/video6", "--resolution", "320x240", "--format", "YUYV", "--host", "0.0.0.0", "--port", "8083"]
 ]
 
 camera_procs = []
-
-# Launch each camera and hide the massive wall of text it usually prints
 for cmd in camera_commands:
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -64,12 +45,12 @@ for cmd in camera_commands:
 
 cams_ok = True
 for cmd in camera_commands:
-    device_path = cmd[2]  # This is the "/dev/videoX" string from your list
+    device_path = cmd[3]
     if not os.path.exists(device_path):
         cams_ok = False
         print(f"Hardware missing: {device_path} is not plugged in.")
-# Give the cameras a brief second to warm up
-time.sleep(1) 
+
+time.sleep(1)
 
 
 # -------------------------------
@@ -85,7 +66,7 @@ try:
         print("IMU successfully connected!")
     else:
         imu = None
-        print("IMU object created, but reports as disconnected. (Check I2C address)")
+        print("IMU object created, but reports as disconnected.")
 except Exception as e:
     imu = None
     print(f"IMU Initialization Error: {e}")
@@ -97,7 +78,7 @@ except Exception as e:
 print("Checking UART connection to Arduino...")
 arduino_ok = False
 try:
-    from motor_control_xbox import ser  # reuse already-open port
+    from motor_control_xbox import ser
     print("Pinging Arduino...")
     while True:
         ser.write(b"PING\n")
@@ -120,65 +101,55 @@ except Exception as e:
 # 🔹 SOCKET SERVER SETUP
 # -------------------------------
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Prevents "Port in use" errors if you restart quickly
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(("0.0.0.0", PORT))
 server.listen(1)
 
 print("Waiting for connection from Laptop...")
 while True:
     server.settimeout(0.1)
-    update_leds(arduino_ok, imu_ok, cams_ok) # UART LED (D1) will blink while waiting
+    update_leds(arduino_ok, imu_ok, cams_ok)
     try:
         conn, addr = server.accept()
         print("Connected from:", addr)
         conn.setblocking(False)
-        uart_ok = True # Socket established
         break
     except socket.timeout:
         continue
 
-#conn, addr = server.accept()
-#print("Connected from:", addr)
-
 buffer = ""
-speed = 25
 last_imu_time = time.time()
-imu_send_rate = 0.1 # send data to laptop every 0.1s (10Hz)
+imu_send_rate = 0.1
+
 
 # -------------------------------
 # 🧠 STATUS HELPER FUNCTION
 # -------------------------------
 def get_status_string(lx, ly, rx, lt, rt, dpad_up, dpad_down):
     directions = []
-
     threshold = 0.2
 
-    # Forward / backward
     if ly > threshold:
         directions.append(f"FORWARD ({ly:.2f})")
     elif ly < -threshold:
         directions.append(f"BACKWARD ({-ly:.2f})")
 
-    # Strafe left / right
     if lx < -threshold:
         directions.append(f"STRAFE LEFT ({-lx:.2f})")
     elif lx > threshold:
         directions.append(f"STRAFE RIGHT ({lx:.2f})")
-    
-    # Turn
+
     if rx < -threshold:
         directions.append(f"TURN LEFT ({-rx:.2f})")
     elif rx > threshold:
         directions.append(f"TURN RIGHT ({rx:.2f})")
 
-    # Vertical (triggers)
     vertical = rt - lt
     if vertical > threshold:
         directions.append(f"UP ({vertical:.2f})")
     elif vertical < -threshold:
         directions.append(f"DOWN ({-vertical:.2f})")
 
-    # D-pad (motor 6)
     if dpad_up > 0.5:
         directions.append("M6 UP")
     elif dpad_down > 0.5:
@@ -189,10 +160,11 @@ def get_status_string(lx, ly, rx, lt, rt, dpad_up, dpad_down):
 
     return " | ".join(directions)
 
+
 try:
     while True:
         time.sleep(0.005)
-        update_leds(arduino_ok, imu_ok, cams_ok) #update indicators at top of loop
+        update_leds(arduino_ok, imu_ok, cams_ok)
 
         try:
             data = conn.recv(1024)
@@ -205,7 +177,6 @@ try:
 
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
-
                 try:
                     lx, ly, rx, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
                     write_to_motors(
@@ -221,13 +192,14 @@ try:
                         f=f > 0.5,
                         speed=25
                     )
-
                     status = get_status_string(lx, ly, rx, lt, rt, r, f)
+                    print(f"\rROV STATUS: {status}        ", end="", flush=True)
 
                 except Exception as e:
-                    print(f"An error occured: {e}")
+                    print(f"An error occurred: {e}")
+
         except BlockingIOError:
-            pass # no data this millisecond, keep looping
+            pass
         except ConnectionResetError:
             break
 
@@ -235,35 +207,21 @@ try:
             try:
                 if imu.dataReady():
                     imu.getAgmt()
-
                     telemetry = f"IMU:{imu.axRaw},{imu.ayRaw},{imu.azRaw},{imu.gxRaw},{imu.gyRaw},{imu.gzRaw}\n"
-                    
                     conn.sendall(telemetry.encode())
                     last_imu_time = time.time()
-                    
-                    # 🔹 NEW: Print the exact string being sent to the Mac
-                    print(f"Successfully read and sent: {telemetry.strip()}")
-                    
             except Exception as e:
-                # 🔹 NEW: Instead of 'pass', print the error so you know exactly why it failed
                 print(f"IMU Read Error: {e}")
-
 
 finally:
     print("\nShutting down ROV systems...")
     GPIO.cleanup()
-
     try:
-        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, speed)  # Stop all motors
+        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, speed)
     except:
         pass
-    
-    # Close the socket
     conn.close()
     server.close()
-    
-    # Kill the camera streams (crucial!)
     for proc in camera_procs:
         proc.terminate()
-        
     print("Cleanup complete.")
