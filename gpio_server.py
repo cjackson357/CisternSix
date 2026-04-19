@@ -178,7 +178,9 @@ try:
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 try:
+                    t1 = time.time()
                     lx, ly, rx, lt, rt, r, f = [float(x) for x in line.strip().split(",")]
+                    t2 = time.time()
                     write_to_motors(
                         w=ly > 0.2,
                         a=lx < -0.2,
@@ -192,9 +194,8 @@ try:
                         f=f > 0.5,
                         speed=25
                     )
-                    status = get_status_string(lx, ly, rx, lt, rt, r, f)
-                    print(f"\rROV STATUS: {status}        ", end="", flush=True)
-
+                    t3 = time.time()
+                    print(f"parse={t2-t1:.4f}s  motors={t3-t2:.4f}s  total={t3-t1:.4f}s")
                 except Exception as e:
                     print(f"An error occurred: {e}")
 
