@@ -105,9 +105,4 @@ void parseCommand(String cmd) {
     start = comma + 1;
   }
 
-  for (int i = 0; i < 6; i++) {
-    echo += "M" + String(i + 1) + ":" + String(motorValues[i]);
-    if (i < 5) echo += ",";
-  }
-  Serial.println(echo);
 }

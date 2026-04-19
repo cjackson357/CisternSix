@@ -25,18 +25,6 @@ def send_all_motors(values):
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
 
-    if ser.in_waiting:
-        echo = ser.readline().decode('utf-8', errors='ignore').strip()
-        if echo == "READY":
-            print("Arduino reset detected — redoing handshake...")
-            do_handshake()
-        elif echo.startswith("DRIVING:"):
-            pass  # valid echo, no need to print
-        elif echo == "BUFFER_OVERFLOW":
-            print("Arduino buffer overflow — flushing...")
-            ser.reset_output_buffer()
-            time.sleep(0.1)
-
 current_thrusters = 128 * np.ones(6)
 
 def write_to_motors(w, a, s, d, turn_left, turn_right, q, e, r, f, speed):
