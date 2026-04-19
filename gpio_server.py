@@ -218,7 +218,7 @@ finally:
     print("\nShutting down ROV systems...")
     GPIO.cleanup()
     try:
-        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, speed)
+        write_to_motors(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     except:
         pass
     conn.close()
