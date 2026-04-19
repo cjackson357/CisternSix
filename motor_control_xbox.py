@@ -70,9 +70,9 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
     if e:
         thrusters[4] -= 1.3 * speed
     if r:
-        thrusters[5] += 64
+        thrusters[5] += 255
     if f:
-        thrusters[5] -= 64
+        thrusters[5] -= 255
 
     index = [4, 2, 0, 3, 1, 5]
     thrusters = thrusters[index]
