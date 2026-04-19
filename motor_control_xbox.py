@@ -81,14 +81,18 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
 
     crossing = (current_thrusters - 128) * (thrusters - 128) < 0
     
-    step = 1
+    # First determine effective target
     effective_target = thrusters.copy()
     effective_target[crossing] = 128
 
-    current_thrusters = np.clip(
-        effective_target,
-        current_thrusters - step,
-        current_thrusters + step
+    # Then compute diff and step based on correct target
+    diff = effective_target - current_thrusters
+    step = np.clip(np.abs(diff) * 0.3, 2, 15)
+
+    current_thrusters = np.where(
+        diff > 0,
+        np.minimum(current_thrusters + step, effective_target),
+        np.maximum(current_thrusters - step, effective_target)
     )
 
     send_all_motors(current_thrusters)
