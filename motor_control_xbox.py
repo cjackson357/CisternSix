@@ -10,7 +10,8 @@ ser = serial.Serial(
 
 def send_all_motors(values):
     ser.reset_input_buffer()
-    parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(values)]
+    snapped = np.where(np.abs(values - 128) < 5, 128, values)
+    parts = [f"M{i+1}:{int(v)}" for i, v in enumerate(snapped)]
     cmd = ",".join(parts) + "\n"
     ser.write(cmd.encode('utf-8'))
 
