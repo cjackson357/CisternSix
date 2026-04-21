@@ -68,27 +68,19 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
 
     index = [4, 2, 0, 3, 1, 5]
     thrusters = thrusters[index]
+
     thrusters = np.clip(thrusters, 0, 255)
 
-    # Fix motor 6
-    if r:
-        thrusters[5] = np.clip(128 + speed, 0, 255)
-    if f:
-        thrusters[5] = np.clip(128 - speed, 0, 255)
-
     crossing = (current_thrusters - 128) * (thrusters - 128) < 0
-
+    
+    step = 1
     effective_target = thrusters.copy()
     effective_target[crossing] = 128
 
-    # Proportional step — fast when far, slow when close
-    diff = effective_target - current_thrusters
-    step = np.clip(np.abs(diff) * 0.3, 3, 12)
-
-    current_thrusters = np.where(
-        diff > 0,
-        np.minimum(current_thrusters + step, effective_target),
-        np.maximum(current_thrusters - step, effective_target)
+    current_thrusters = np.clip(
+        effective_target,
+        current_thrusters - step,
+        current_thrusters + step
     )
 
     send_all_motors(current_thrusters)
