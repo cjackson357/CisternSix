@@ -84,5 +84,7 @@ def write_to_motors(w, a, s, d, turn_left, turn_right,q, e, r, f, speed):
         current_thrusters + step
     )
 
+    current_thrusters[5] = thrusters[5]
+
     send_all_motors(current_thrusters)
     
