@@ -20,6 +20,7 @@ def apply_deadzone(val):
 lx = 0
 ly = 0
 rx = 0
+ry = 0
 lt = 0
 rt = 0
 dpad_up = 0
@@ -29,7 +30,7 @@ dpad_down = 0
 # 🎮 INPUT THREAD
 # -------------------------------
 def input_thread():
-    global lx, ly, rx, lt, rt, dpad_up, dpad_down
+    global lx, ly, rx, ry, lt, rt, dpad_up, dpad_down
     while True:
         events = get_gamepad()
         for event in events:
@@ -39,6 +40,8 @@ def input_thread():
                 ly = apply_deadzone(-event.state / 32768)
             elif event.code == 'ABS_RX':
                 rx = apply_deadzone(event.state / 32768)
+            elif event.code == 'ABS_RY':
+                ry = apply_deadzone(-event.state / 32768)
             elif event.code == 'ABS_Z':
                 lt = event.state / 255
             elif event.code == 'ABS_RZ':
@@ -186,7 +189,8 @@ class ROVDashboard:
         self.canvas.create_text(100, 355, text="LT", fill="white", font=("Arial", 12, "bold"))
         self.canvas.create_text(300, 355, text="RT", fill="white", font=("Arial", 12, "bold"))
 
-        self.joy_center = (200, 420)
+        self.joy_center = (150, 420)
+        self.joy2_center = (250, 420)
         self.joy_radius = 40
 
         self.canvas.create_oval(
@@ -196,8 +200,21 @@ class ROVDashboard:
             self.joy_center[1] + self.joy_radius,
             outline="white"
         )
+        self.canvas.create_oval(
+            self.joy2_center[0] - self.joy_radius,
+            self.joy2_center[1] - self.joy_radius,
+            self.joy2_center[0] + self.joy_radius,
+            self.joy2_center[1] + self.joy_radius,
+            outline="white"
+        )
+
+        self.canvas.create_text(self.joy_center[0], self.joy_center[1] + self.joy_radius + 15,
+                                text="L", fill="white", font=("Arial", 14, "bold"))
+        self.canvas.create_text(self.joy2_center[0], self.joy2_center[1] + self.joy_radius + 15,
+                                text="R", fill="white", font=("Arial", 14, "bold"))
 
         self.joy_dot = self.canvas.create_oval(0, 0, 0, 0, fill="white")
+        self.joy2_dot = self.canvas.create_oval(0, 0, 0, 0, fill="white")
 
         self.dpad_up_rect = self.canvas.create_rectangle(190, 500, 210, 520, fill="white")
         self.dpad_down_rect = self.canvas.create_rectangle(190, 540, 210, 560, fill="white")
@@ -241,10 +258,17 @@ class ROVDashboard:
         x = cx + lx * r
         y = cy + ly * r
 
+        right_cx, right_cy = self.joy2_center
+        x2 = right_cx + rx * r
+        y2 = right_cy + ry * r
+
         color = "lime" if abs(lx) > 0.1 or abs(ly) > 0.1 else "white"
+        color2 = "lime" if abs(rx) > 0.1 or abs(ry) > 0.1 else "white"
 
         self.canvas.coords(self.joy_dot, x-8, y-8, x+8, y+8)
         self.canvas.itemconfig(self.joy_dot, fill=color)
+        self.canvas.coords(self.joy2_dot, x2-8, y2-8, x2+8, y2+8)
+        self.canvas.itemconfig(self.joy2_dot, fill=color2)
 
         self.canvas.itemconfig(self.dpad_up_rect, fill="lime" if dpad_up else "white")
         self.canvas.itemconfig(self.dpad_down_rect, fill="lime" if dpad_down else "white")
